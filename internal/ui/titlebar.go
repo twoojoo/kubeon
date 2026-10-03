@@ -84,9 +84,11 @@ func (t *TitleBar) Layout(gtx C) D {
 	if dim {
 		fg, fgDim = pal.TextDim, pal.TextDim
 	}
-	fillRect(gtx, rgb(0x17191c), image.Rect(0, 0, w, h))
+	// same surface as the sidebar/panels; the brand block lines up with
+	// the sidebar via a divider
+	fillRect(gtx, pal.Sidebar, image.Rect(0, 0, w, h))
 	sideW := gtx.Dp(240)
-	fillRect(gtx, rgb(0x1b1e21), image.Rect(0, 0, sideW, h))
+	fillRect(gtx, pal.Border, image.Rect(sideW, gtx.Dp(8), sideW+gtx.Dp(1), h-gtx.Dp(8)))
 	fillRect(gtx, pal.Border, image.Rect(0, h-gtx.Dp(1), w, h))
 
 	center := func(wd layout.Widget) layout.Widget {
@@ -161,7 +163,7 @@ func (t *TitleBar) Layout(gtx C) D {
 				if t.searchBtn.Hovered() {
 					b = pal.TextDim
 				}
-				return rborder(gtx, b, rgb(0x202326), 7, func(gtx C) D {
+				return rborder(gtx, b, pal.Bg, 7, func(gtx C) D {
 					gtx.Constraints.Min = gtx.Constraints.Max
 					return insetHV(10, 0).Layout(gtx, func(gtx C) D {
 						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,

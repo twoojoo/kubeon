@@ -4,6 +4,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"image"
 	"log/slog"
 	"sync"
 	"time"
@@ -56,15 +57,16 @@ type App struct {
 	sidebar *Sidebar
 	title   *TitleBar
 
-	maximized, winFocused bool
-	view                  *ResourceView
-	ovw                   *OverviewView
-	xray                  *XRayView
-	page                  string // current gvr, overviewGVR or xrayPage
-	navStack              []navState
-	drawer                *Drawer
-	dock                  *Dock
-	overlay               overlay
+	maximized, winFocused  bool
+	backdropTag, dialogTag int
+	view                   *ResourceView
+	ovw                    *OverviewView
+	xray                   *XRayView
+	page                   string // current gvr, overviewGVR or xrayPage
+	navStack               []navState
+	drawer                 *Drawer
+	dock                   *Dock
+	overlay                overlay
 
 	ctxBtn  widget.Clickable
 	pfBtn   widget.Clickable
@@ -318,20 +320,53 @@ func (a *App) layout(gtx C) {
 	}
 }
 
+// layoutModal draws the active overlay over a dimmed backdrop. A click on
+// the backdrop (outside the dialog) dismisses it, like Esc.
 func (a *App) layoutModal(gtx C) {
 	gtx.Constraints.Min = gtx.Constraints.Max
-	// dim background and swallow pointer events
-	defer clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops).Pop()
-	event.Op(gtx.Ops, a.overlay)
+	size := gtx.Constraints.Max
+	ov := a.overlay
+
+	// lay out the dialog first (recorded) to know its bounds
+	m := op.Record(gtx.Ops)
+	top := gtx.Dp(90)
+	dg := gtx
+	dg.Constraints.Min = image.Point{}
+	dg.Constraints.Max.Y = max(0, size.Y-top)
+	dims := ov.Layout(dg)
+	content := m.Stop()
+	x := (size.X - dims.Size.X) / 2
+	box := image.Rectangle{Min: image.Pt(x, top), Max: image.Pt(x+dims.Size.X, top+dims.Size.Y)}
+
+	// backdrop: dims the app, swallows input, dismisses on press
+	backdrop := clip.Rect{Max: size}.Push(gtx.Ops)
+	event.Op(gtx.Ops, &a.backdropTag)
 	for {
-		if _, ok := gtx.Event(pointer.Filter{Target: a.overlay, Kinds: pointer.Press | pointer.Scroll, ScrollY: pointer.ScrollRange{Min: -1e6, Max: 1e6}}); !ok {
+		ev, ok := gtx.Event(pointer.Filter{Target: &a.backdropTag, Kinds: pointer.Press | pointer.Release | pointer.Cancel | pointer.Scroll, ScrollY: pointer.ScrollRange{Min: -1e6, Max: 1e6}})
+		if !ok {
 			break
+		}
+		if pe, ok := ev.(pointer.Event); ok && pe.Kind == pointer.Press && !pe.Position.Round().In(box) && a.overlay == ov {
+			a.overlay = nil
+			gtx.Execute(key.FocusCmd{})
 		}
 	}
 	fill(gtx, withAlpha(rgb(0x000000), 0x90))
-	layout.N.Layout(gtx, func(gtx C) D {
-		return layout.Inset{Top: unit.Dp(90)}.Layout(gtx, a.overlay.Layout)
-	})
+	backdrop.Pop()
+
+	// dialog: a blocker under its content keeps clicks on padding/labels
+	// from reaching the backdrop
+	st := op.Offset(box.Min).Push(gtx.Ops)
+	blk := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
+	event.Op(gtx.Ops, &a.dialogTag)
+	for {
+		if _, ok := gtx.Event(pointer.Filter{Target: &a.dialogTag, Kinds: pointer.Press | pointer.Release | pointer.Cancel | pointer.Scroll, ScrollY: pointer.ScrollRange{Min: -1e6, Max: 1e6}}); !ok {
+			break
+		}
+	}
+	content.Add(gtx.Ops)
+	blk.Pop()
+	st.Pop()
 }
 
 func (a *App) layoutMain(gtx C) D {
