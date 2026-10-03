@@ -25,6 +25,18 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | Overview | Nodes, pods by status, deployments health, CPU/memory requests (+usage with metrics-server), warning events |
 | Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |
 
+## Window chrome
+
+k9desk draws its own title bar (Lens-like: brand, cluster › namespace › page
+breadcrumb, command search, window controls). Gio is vendored in
+`third_party/gio` with a small Wayland patch (`third_party/_gio-patches`,
+re-apply with `scripts/vendor-gio.sh`):
+
+- drag the title bar of a maximized window to restore & move it
+- double-click the title bar to maximize / restore
+- right-click the title bar for the compositor window menu
+- window mode stays in sync with compositor actions (Super+↑, drag-to-top, dock restore)
+
 ## Build & run
 
 ```sh

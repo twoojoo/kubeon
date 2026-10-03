@@ -53,15 +53,18 @@ type App struct {
 	statusErr bool
 	statusAt  time.Time
 
-	sidebar  *Sidebar
-	view     *ResourceView
-	ovw      *OverviewView
-	xray     *XRayView
-	page     string // current gvr, overviewGVR or xrayPage
-	navStack []navState
-	drawer   *Drawer
-	dock     *Dock
-	overlay  overlay
+	sidebar *Sidebar
+	title   *TitleBar
+
+	maximized, winFocused bool
+	view                  *ResourceView
+	ovw                   *OverviewView
+	xray                  *XRayView
+	page                  string // current gvr, overviewGVR or xrayPage
+	navStack              []navState
+	drawer                *Drawer
+	dock                  *Dock
+	overlay               overlay
 
 	ctxBtn  widget.Clickable
 	pfBtn   widget.Clickable
@@ -86,7 +89,8 @@ type overlay interface {
 // Run opens the main window and blocks until it is closed.
 func Run(opts Options) error {
 	a := newApp(opts, new(app.Window))
-	a.w.Option(app.Title("k9desk"), app.Size(unit.Dp(1440), unit.Dp(900)), app.MinSize(unit.Dp(800), unit.Dp(500)))
+	a.w.Option(app.Title("k9desk"), app.Size(unit.Dp(1440), unit.Dp(900)), app.MinSize(unit.Dp(800), unit.Dp(500)),
+		app.Decorated(false))
 	a.start()
 
 	errc := make(chan error, 1)
@@ -101,6 +105,7 @@ func newApp(opts Options, w *app.Window) *App {
 		a.notifier = notify.New("k9desk")
 	}
 	a.sidebar = newSidebar(&a)
+	a.title = newTitleBar(&a)
 	a.view = newResourceView(&a)
 	a.ovw = newOverview(&a)
 	a.xray = newXRay(&a)
@@ -135,6 +140,10 @@ func (a *App) loop() error {
 		case app.DestroyEvent:
 			a.shutdown()
 			return e.Err
+		case app.ConfigEvent:
+			a.maximized = e.Config.Mode == app.Maximized || e.Config.Mode == app.Fullscreen
+			a.winFocused = e.Config.Focused
+			a.w.Invalidate()
 		case app.FrameEvent:
 			a.drain()
 			gtx := app.NewContext(&ops, e)
@@ -293,6 +302,7 @@ func (a *App) layout(gtx C) {
 	a.handleKeys(gtx)
 
 	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(a.title.Layout),
 		layout.Flexed(1, func(gtx C) D {
 			return layout.Flex{}.Layout(gtx,
 				layout.Rigid(a.sidebar.Layout),
