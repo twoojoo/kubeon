@@ -27,7 +27,7 @@ type Drawer struct {
 	describe widget.Editor
 	yaml     widget.Editor
 
-	tabBtns                                [2]widget.Clickable
+	tabBtns                               [2]widget.Clickable
 	closeBtn, editBtn, saveBtn, revertBtn widget.Clickable
 }
 

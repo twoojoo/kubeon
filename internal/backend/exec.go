@@ -16,10 +16,10 @@ type TermSize struct{ Cols, Rows uint16 }
 
 // ExecSession is an interactive shell attached to a container.
 type ExecSession struct {
-	Stdin   io.WriteCloser
-	resize  chan remotecommand.TerminalSize
-	cancel  context.CancelFunc
-	stdinR  *io.PipeReader
+	Stdin  io.WriteCloser
+	resize chan remotecommand.TerminalSize
+	cancel context.CancelFunc
+	stdinR *io.PipeReader
 }
 
 // Resize forwards a terminal resize.

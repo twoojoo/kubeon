@@ -24,6 +24,7 @@ type navSection struct {
 // sections mirrors Lens' navigation tree.
 var sections = []navSection{
 	{"Cluster", []navItem{
+		{"Overview", overviewGVR},
 		{"Nodes", "v1/nodes"},
 		{"Namespaces", "v1/namespaces"},
 		{"Events", "events.k8s.io/v1/events"},

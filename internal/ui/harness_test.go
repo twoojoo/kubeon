@@ -142,7 +142,7 @@ func (h *harness) shot(name string) {
 }
 
 func TestUIFlow(t *testing.T) {
-	h := newHarness(t, Options{Namespace: "demo"})
+	h := newHarness(t, Options{Namespace: "demo", Resource: "po"})
 	a := h.a
 	h.waitFor("pods", func() bool { return a.view.snap != nil && len(a.view.snap.Rows) >= 4 })
 	h.shot("01-pods")
@@ -210,4 +210,26 @@ func TestUIFlow(t *testing.T) {
 	h.typeText("crash")
 	h.waitFor("filtered", func() bool { return a.view.snap != nil && len(a.view.snap.Rows) == 1 })
 	h.shot("09-filter")
+}
+
+func TestUIOverviewAndStress(t *testing.T) {
+	h := newHarness(t, Options{})
+	a := h.a
+	h.waitFor("overview", func() bool { return a.ovw.data != nil })
+	h.shot("10-overview")
+
+	// large table: all configmaps (2000+ with STRESS=1 fixtures)
+	a.openResource("v1/configmaps")
+	h.waitFor("configmaps", func() bool { return a.view.snap != nil && !a.view.snap.Loading && len(a.view.snap.Rows) > 0 })
+	n := len(a.view.snap.Rows)
+	start := time.Now()
+	frames := 0
+	for time.Since(start) < 2*time.Second {
+		a.view.move(7)
+		h.frame()
+		frames++
+	}
+	el := time.Since(start)
+	t.Logf("%d rows: %d frames in %v (%.1f ms/frame incl. GPU readback-free render)", n, frames, el, float64(el.Milliseconds())/float64(frames))
+	h.shot("11-configmaps")
 }

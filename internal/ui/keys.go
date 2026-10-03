@@ -28,6 +28,7 @@ func (a *App) handleKeys(gtx C) {
 			key.Filter{Name: "L"}, key.Filter{Name: "P"}, key.Filter{Name: "S"},
 			key.Filter{Name: "Y"}, key.Filter{Name: "D"}, key.Filter{Name: "E"},
 			key.Filter{Name: "W"}, key.Filter{Name: "N"}, key.Filter{Name: "R"},
+			key.Filter{Name: "F", Required: key.ModShift},
 			key.Filter{Name: "D", Required: key.ModCtrl},
 			key.Filter{Name: "K", Required: key.ModCtrl},
 			key.Filter{Name: "R", Required: key.ModCtrl},
@@ -100,6 +101,8 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		a.pickNamespace()
 	case e.Name == "R":
 		v.restart()
+	case e.Name == "F":
+		v.portForward()
 	case e.Name == "0":
 		a.setNamespace("")
 	}

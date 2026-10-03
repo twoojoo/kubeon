@@ -25,8 +25,8 @@ type (
 
 // Palette is a Lens-like dark palette.
 type Palette struct {
-	Bg, Sidebar, Panel, Header, Border, Hover, Selected color.NRGBA
-	Text, TextDim, TextBright, Accent, Ok, Warn, Err, Info  color.NRGBA
+	Bg, Sidebar, Panel, Header, Border, Hover, Selected    color.NRGBA
+	Text, TextDim, TextBright, Accent, Ok, Warn, Err, Info color.NRGBA
 }
 
 var pal = Palette{

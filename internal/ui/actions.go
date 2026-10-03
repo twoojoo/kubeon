@@ -189,7 +189,7 @@ func (a *App) openPalette(prefill string) {
 			return false
 		}
 		switch f[0] {
-		case "ns", "namespace", "ctx", "context", "q", "quit":
+		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards":
 			return true
 		}
 		_, ok := backend.LookupAlias(f[0])
@@ -224,6 +224,9 @@ func (a *App) runCommand(cmd string) {
 		}
 		a.connect(f[1])
 		return
+	case "pf", "portforwards":
+		a.pickForward()
+		return
 	case "q", "quit":
 		if a.w != nil {
 			a.w.Perform(system.ActionClose)
@@ -239,4 +242,82 @@ func (a *App) runCommand(cmd string) {
 		a.ns = strings.TrimPrefix(f[1], "all")
 	}
 	a.openResource(gvr)
+}
+
+func canForward(gvr string) bool {
+	switch gvr {
+	case "v1/pods", "v1/services", "apps/v1/deployments", "apps/v1/statefulsets", "apps/v1/daemonsets":
+		return true
+	}
+	return false
+}
+
+// portForward asks for "local:remote" and opens a tunnel.
+func (v *ResourceView) portForward() {
+	r, ok := v.selected()
+	if !ok || !canForward(v.gvr) {
+		return
+	}
+	a, c, gvr, path := v.app, v.app.cluster, v.gvr, r.ID
+	go func() {
+		ports, err := c.ContainerPorts(gvr, path)
+		a.post(func() {
+			if err != nil {
+				a.flash("ports: "+err.Error(), true)
+				return
+			}
+			var items []string
+			for _, p := range ports {
+				items = append(items, fmt.Sprintf("%d:%d", p, p))
+			}
+			p := newPicker(a, "Port-forward "+path+"  (local:remote, local 0 = random)", items, true, func(s string) {
+				lp, rp, ok := strings.Cut(strings.TrimSpace(s), ":")
+				if !ok {
+					lp, rp = "0", lp
+				}
+				l, e1 := strconv.Atoi(lp)
+				rr, e2 := strconv.Atoi(rp)
+				if e1 != nil || e2 != nil || rr <= 0 {
+					a.flash("invalid ports, use local:remote", true)
+					return
+				}
+				a.flash("Port-forward "+path+"…", false)
+				go func() {
+					pf, err := c.PortForward(gvr, path, l, rr)
+					a.post(func() {
+						if err != nil {
+							a.flash("port-forward failed: "+err.Error(), true)
+							return
+						}
+						a.flash("Forwarding "+pf.String(), false)
+					})
+				}()
+			})
+			p.exact = func(s string) bool { return strings.Contains(s, ":") }
+			a.overlay = p
+		})
+	}()
+}
+
+// pickForward lists active forwards; picking one stops it.
+func (a *App) pickForward() {
+	if a.cluster == nil {
+		return
+	}
+	pfs := a.cluster.PortForwards()
+	if len(pfs) == 0 {
+		a.flash("no active port-forwards", false)
+		return
+	}
+	var items []string
+	ids := map[string]string{}
+	for _, p := range pfs {
+		items = append(items, p.String())
+		ids[p.String()] = p.ID
+	}
+	c := a.cluster
+	a.overlay = newPicker(a, "Active port-forwards — select to stop", items, false, func(s string) {
+		c.StopPortForward(ids[s])
+		a.flash("Stopped "+s, false)
+	})
 }

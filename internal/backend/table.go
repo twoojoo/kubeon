@@ -90,17 +90,17 @@ type TableWatch struct {
 	onSnap  func(*Snapshot)
 	colorer model1.ColorerFunc
 
-	mx       sync.Mutex
-	raw      *model1.TableData
-	filter   string
-	sortCol  string
-	sortAsc  bool
-	wide     bool
-	lastErr  error
-	seq      atomic.Uint64
-	pending  atomic.Bool
-	kick     chan struct{}
-	closed   atomic.Bool
+	mx      sync.Mutex
+	raw     *model1.TableData
+	filter  string
+	sortCol string
+	sortAsc bool
+	wide    bool
+	lastErr error
+	seq     atomic.Uint64
+	pending atomic.Bool
+	kick    chan struct{}
+	closed  atomic.Bool
 }
 
 // Watch starts watching gvr in ns ("" = all namespaces). onSnap is called

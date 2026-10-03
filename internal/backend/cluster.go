@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -52,7 +51,7 @@ type Cluster struct {
 	conn    *client.APIClient
 	factory *watch.Factory
 
-	mx      sync.RWMutex
+	pf      forwards
 	version string
 }
 
@@ -117,6 +116,7 @@ func (c *Cluster) RefreshResources() error {
 
 // Close stops all informers and port-forwards.
 func (c *Cluster) Close() {
+	c.stopAllForwards()
 	c.factory.Terminate()
 }
 

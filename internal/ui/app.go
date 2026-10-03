@@ -53,6 +53,8 @@ type App struct {
 
 	sidebar *Sidebar
 	view    *ResourceView
+	ovw     *OverviewView
+	page    string // current gvr or overviewGVR
 	drawer  *Drawer
 	dock    *Dock
 	overlay overlay
@@ -85,6 +87,7 @@ func newApp(opts Options, w *app.Window) *App {
 	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w}
 	a.sidebar = newSidebar(&a)
 	a.view = newResourceView(&a)
+	a.ovw = newOverview(&a)
 	a.drawer = newDrawer(&a)
 	a.dock = newDock(&a)
 	return &a
@@ -145,6 +148,7 @@ func (a *App) drain() {
 
 func (a *App) shutdown() {
 	a.view.close()
+	a.ovw.close()
 	a.dock.closeAll()
 	if a.cluster != nil {
 		a.cluster.Close()
@@ -181,6 +185,7 @@ func (a *App) connect(kctx string) {
 		return
 	}
 	a.view.close()
+	a.ovw.close()
 	a.dock.closeAll()
 	a.drawer.close()
 	if a.cluster != nil {
@@ -210,7 +215,9 @@ func (a *App) connect(kctx string) {
 			a.sidebar.reload(c)
 			res := a.opts.Resource
 			if res == "" {
-				res = "v1/pods"
+				res = overviewGVR
+			} else if g, ok := backend.LookupAlias(res); ok {
+				res = g
 			}
 			a.openResource(res)
 			a.flash(fmt.Sprintf("Connected to %s (%s)", c.Context, c.Version()), false)
@@ -236,13 +243,23 @@ func (a *App) openResource(gvr string) {
 		return
 	}
 	a.drawer.close()
-	a.view.open(gvr, a.ns)
+	a.page = gvr
 	a.sidebar.active = gvr
+	if gvr == overviewGVR {
+		a.view.close()
+		a.view.gvr = ""
+		a.ovw.open(a.ns)
+		return
+	}
+	a.ovw.close()
+	a.view.open(gvr, a.ns)
 }
 
 func (a *App) setNamespace(ns string) {
 	a.ns = ns
-	if a.view.gvr != "" {
+	if a.page == overviewGVR {
+		a.ovw.open(ns)
+	} else if a.view.gvr != "" {
 		a.view.open(a.view.gvr, ns)
 	}
 }
@@ -301,6 +318,9 @@ func (a *App) layoutMain(gtx C) D {
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Flexed(1, func(gtx C) D {
+			if a.page == overviewGVR {
+				return a.ovw.Layout(gtx)
+			}
 			if !a.drawer.open {
 				return a.view.Layout(gtx)
 			}
@@ -360,6 +380,9 @@ func (a *App) layoutStatus(gtx C) D {
 					name := "no cluster"
 					if a.cluster != nil {
 						name = a.cluster.Context + "  ·  " + a.cluster.Version()
+						if n := len(a.cluster.PortForwards()); n > 0 {
+							name += "  ·  " + itoa(n) + " port-forward(s)"
+						}
 					}
 					return lbl(gtx, a.th, fontSans, 12, pal.TextBright, name)
 				})

@@ -4,12 +4,21 @@ package backend
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
+
 	"github.com/giovanni/k9desk/internal/safety"
+	"github.com/giovanni/k9desk/third_party/k9s/client"
 )
 
 // Runs only against the disposable kind cluster (.dev/kubeconfig).
@@ -129,3 +138,121 @@ func TestCRDAndYAMLAndLogs(t *testing.T) {
 		t.Fatal("no logs")
 	}
 }
+
+func TestPortForward(t *testing.T) {
+	c := devCluster(t)
+	ch := make(chan *Snapshot, 16)
+	tw := c.Watch("apps/v1/deployments", "demo", func(s *Snapshot) { ch <- s })
+	defer tw.Close()
+	waitSnap(t, ch, func(s *Snapshot) bool { return len(s.Rows) >= 2 })
+	ports, err := c.ContainerPorts("apps/v1/deployments", "demo/web")
+	if err != nil || len(ports) == 0 {
+		t.Fatalf("ports %v %v", ports, err)
+	}
+	pf, err := c.PortForward("apps/v1/deployments", "demo/web", 0, ports[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.StopPortForward(pf.ID)
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/", pf.Local))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(b), "k9desk-ok") {
+		t.Fatalf("body %q", b)
+	}
+	if len(c.PortForwards()) != 1 {
+		t.Fatal("forward not tracked")
+	}
+}
+
+func TestOverview(t *testing.T) {
+	c := devCluster(t)
+	c.Watch("v1/pods", "", func(*Snapshot) {}).Close()
+	o := c.Overview("")
+	t.Logf("%+v", o)
+	if o.Nodes != 1 || o.Pods < 5 || o.CPUCapacity == 0 || o.Deployments < 2 {
+		t.Fatalf("bad overview %+v", o)
+	}
+	if o.DeploymentsBad < 1 {
+		t.Fatal("crasher should be unavailable")
+	}
+}
+
+func TestMutations(t *testing.T) {
+	c := devCluster(t)
+	const cm = `apiVersion: v1
+kind: ConfigMap
+metadata: {name: k9desk-mut, namespace: demo}
+data: {v: "1"}
+`
+	_ = c.Delete("v1/configmaps", "demo/k9desk-mut", true)
+	dial, _ := c.conn.DynDial()
+	var u unstructuredObj
+	if err := yamlToObj(cm, &u); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dial.Resource(client.CmGVR.GVR()).Namespace("demo").Create(context.Background(), u.obj(), metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	ch := make(chan *Snapshot, 16)
+	tw := c.Watch("v1/configmaps", "demo", func(s *Snapshot) { ch <- s })
+	defer tw.Close()
+	waitSnap(t, ch, func(s *Snapshot) bool { return hasRow(s, "demo/k9desk-mut") })
+
+	y, err := c.YAML("v1/configmaps", "demo/k9desk-mut")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Apply("v1/configmaps", strings.Replace(y, `v: "1"`, `v: "2"`, 1)); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		y2, _ := c.YAML("v1/configmaps", "demo/k9desk-mut")
+		if strings.Contains(y2, `v: "2"`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("apply not visible:\n%s", y2)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if err := c.Scale("apps/v1/deployments", "demo/web", 2); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := c.Replicas("apps/v1/deployments", "demo/web"); err != nil || n != 2 {
+		t.Logf("replicas=%d err=%v (informer lag ok)", n, err)
+	}
+	if err := c.Scale("apps/v1/deployments", "demo/web", 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Restart("apps/v1/deployments", "demo/web"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Delete("v1/configmaps", "demo/k9desk-mut", false); err != nil {
+		t.Fatal(err)
+	}
+	waitSnap(t, ch, func(s *Snapshot) bool { return !hasRow(s, "demo/k9desk-mut") })
+}
+
+func hasRow(s *Snapshot, id string) bool {
+	for _, r := range s.Rows {
+		if r.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+type unstructuredObj struct{ m map[string]any }
+
+func (u *unstructuredObj) obj() *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: u.m}
+}
+
+func yamlToObj(s string, u *unstructuredObj) error { return yaml.Unmarshal([]byte(s), &u.m) }

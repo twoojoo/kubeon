@@ -56,7 +56,7 @@ type ResourceView struct {
 	lastFilter string
 	wide       bool
 
-	nsBtn, logsBtn, shellBtn, yamlBtn, descBtn, delBtn, scaleBtn, restartBtn widget.Clickable
+	pfBtn, nsBtn, logsBtn, shellBtn, yamlBtn, descBtn, delBtn, scaleBtn, restartBtn widget.Clickable
 }
 
 func newResourceView(a *App) *ResourceView {
@@ -223,6 +223,9 @@ func (v *ResourceView) handleToolbar(gtx C) {
 	if v.descBtn.Clicked(gtx) {
 		v.details(tabDescribe)
 	}
+	if v.pfBtn.Clicked(gtx) {
+		v.portForward()
+	}
 	if v.scaleBtn.Clicked(gtx) {
 		v.scale()
 	}
@@ -306,6 +309,7 @@ func (v *ResourceView) layoutActions(gtx C) D {
 	isPod := v.gvr == "v1/pods"
 	add(&v.logsBtn, "Logs", c.IsLoggable(v.gvr))
 	add(&v.shellBtn, "Shell", isPod)
+	add(&v.pfBtn, "Forward", canForward(v.gvr))
 	add(&v.descBtn, "Describe", true)
 	add(&v.yamlBtn, "YAML", true)
 	add(&v.scaleBtn, "Scale", c.CanScale(v.gvr))
