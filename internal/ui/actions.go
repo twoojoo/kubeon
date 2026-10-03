@@ -1,0 +1,242 @@
+package ui
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"gioui.org/io/system"
+
+	"github.com/giovanni/k9desk/internal/backend"
+)
+
+// enter drills down like k9s: namespaces → pods, CRDs → instances,
+// otherwise opens the details drawer.
+func (v *ResourceView) enter() {
+	r, ok := v.selected()
+	if !ok {
+		return
+	}
+	switch v.gvr {
+	case "v1/namespaces":
+		v.app.ns = r.Cells[0]
+		v.app.openResource("v1/pods")
+		return
+	case "apiextensions.k8s.io/v1/customresourcedefinitions":
+		for _, res := range v.app.cluster.Resources() {
+			if res.Name+"."+res.Group == r.Cells[0] {
+				v.app.openResource(res.GVR)
+				return
+			}
+		}
+	}
+	v.details(tabDescribe)
+}
+
+func (v *ResourceView) details(tab int) {
+	r, ok := v.selected()
+	if !ok {
+		return
+	}
+	v.app.drawer.show(v.gvr, r.ID, tab, false)
+}
+
+func (v *ResourceView) edit() {
+	r, ok := v.selected()
+	if !ok {
+		return
+	}
+	v.app.drawer.show(v.gvr, r.ID, tabYAML, true)
+}
+
+func (v *ResourceView) logs(previous bool) {
+	r, ok := v.selected()
+	c := v.app.cluster
+	if !ok || !c.IsLoggable(v.gvr) {
+		return
+	}
+	v.app.dock.openLogs(v.gvr, r.ID, previous)
+}
+
+func (v *ResourceView) shell() {
+	r, ok := v.selected()
+	if !ok || v.gvr != "v1/pods" {
+		return
+	}
+	a := v.app
+	c := a.cluster
+	path := r.ID
+	go func() {
+		cc, err := c.Containers(path)
+		a.post(func() {
+			if err != nil {
+				a.flash("containers: "+err.Error(), true)
+				return
+			}
+			if len(cc) == 1 {
+				a.dock.openShell(path, cc[0])
+				return
+			}
+			a.overlay = newPicker(a, "Shell into container", cc, false, func(co string) {
+				a.dock.openShell(path, co)
+			})
+		})
+	}()
+}
+
+func (v *ResourceView) scale() {
+	r, ok := v.selected()
+	c := v.app.cluster
+	if !ok || !c.CanScale(v.gvr) {
+		return
+	}
+	a, gvr, path := v.app, v.gvr, r.ID
+	go func() {
+		cur, err := c.Replicas(gvr, path)
+		a.post(func() {
+			if err != nil {
+				a.flash("replicas: "+err.Error(), true)
+				return
+			}
+			p := newPicker(a, fmt.Sprintf("Scale %s (current %d) — type replicas", path, cur), nil, true, func(s string) {
+				n, err := strconv.Atoi(strings.TrimSpace(s))
+				if err != nil || n < 0 {
+					a.flash("invalid replica count", true)
+					return
+				}
+				a.do(fmt.Sprintf("Scale %s to %d", path, n), func() error {
+					return c.Scale(gvr, path, int32(n))
+				})
+			})
+			p.editor.SetText(strconv.Itoa(int(cur)))
+			a.overlay = p
+		})
+	}()
+}
+
+func (v *ResourceView) restart() {
+	r, ok := v.selected()
+	c := v.app.cluster
+	if !ok || !c.CanRestart(v.gvr) {
+		return
+	}
+	a, gvr, path := v.app, v.gvr, r.ID
+	a.overlay = newConfirm(a, "Restart", fmt.Sprintf("Rollout restart %s?", path), false, func(bool) {
+		a.do("Restart "+path, func() error { return c.Restart(gvr, path) })
+	})
+}
+
+func (v *ResourceView) confirmDelete() {
+	r, ok := v.selected()
+	if !ok || !backend.CanVerb(v.gvr, "delete") {
+		return
+	}
+	a, gvr, path, c := v.app, v.gvr, r.ID, v.app.cluster
+	a.overlay = newConfirm(a, "Delete", fmt.Sprintf("Delete %s %s?", titleFor(gvr), path), true, func(force bool) {
+		a.do("Delete "+path, func() error { return c.Delete(gvr, path, force) })
+	})
+}
+
+func (a *App) pickNamespace() {
+	if a.cluster == nil {
+		return
+	}
+	a.refreshNamespaces()
+	items := append([]string{"All namespaces"}, a.namespaces...)
+	a.overlay = newPicker(a, "Namespace", items, false, func(s string) {
+		if s == "All namespaces" {
+			s = ""
+		}
+		a.setNamespace(s)
+	})
+}
+
+func (a *App) pickContext() {
+	a.overlay = newPicker(a, "Switch context", a.contexts, false, func(s string) {
+		a.connect(s)
+	})
+}
+
+// openPalette opens the k9s-like command prompt: resource aliases
+// (po, deploy, svc, crd names…), "ns <name>", "ctx <name>".
+func (a *App) openPalette(prefill string) {
+	if a.cluster == nil {
+		return
+	}
+	var items []string
+	seen := map[string]bool{}
+	for _, sec := range sections {
+		for _, it := range sec.items {
+			items = append(items, it.title+"  ·  "+it.gvr)
+			seen[it.gvr] = true
+		}
+	}
+	for _, r := range a.cluster.Resources() {
+		if !seen[r.GVR] {
+			items = append(items, r.Kind+"  ·  "+r.GVR)
+		}
+	}
+	for _, n := range a.namespaces {
+		items = append(items, "ns "+n)
+	}
+	for _, n := range a.contexts {
+		items = append(items, "ctx "+n)
+	}
+	p := newPicker(a, "Command  (resource alias, ns <name>, ctx <name>)", items, true, a.runCommand)
+	p.exact = func(s string) bool {
+		f := strings.Fields(strings.TrimPrefix(s, ":"))
+		if len(f) == 0 {
+			return false
+		}
+		switch f[0] {
+		case "ns", "namespace", "ctx", "context", "q", "quit":
+			return true
+		}
+		_, ok := backend.LookupAlias(f[0])
+		return ok
+	}
+	p.editor.SetText(prefill)
+	a.overlay = p
+}
+
+func (a *App) runCommand(cmd string) {
+	cmd = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(cmd), ":"))
+	if i := strings.Index(cmd, "  ·  "); i >= 0 {
+		a.openResource(cmd[i+len("  ·  "):])
+		return
+	}
+	f := strings.Fields(cmd)
+	if len(f) == 0 {
+		return
+	}
+	switch f[0] {
+	case "ns", "namespace":
+		if len(f) == 1 {
+			a.pickNamespace()
+			return
+		}
+		a.setNamespace(strings.TrimPrefix(f[1], "all"))
+		return
+	case "ctx", "context":
+		if len(f) == 1 {
+			a.pickContext()
+			return
+		}
+		a.connect(f[1])
+		return
+	case "q", "quit":
+		if a.w != nil {
+			a.w.Perform(system.ActionClose)
+		}
+		return
+	}
+	gvr, ok := backend.LookupAlias(f[0])
+	if !ok {
+		a.flash(fmt.Sprintf("unknown command %q", f[0]), true)
+		return
+	}
+	if len(f) > 1 {
+		a.ns = strings.TrimPrefix(f[1], "all")
+	}
+	a.openResource(gvr)
+}
