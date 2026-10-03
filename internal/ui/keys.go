@@ -29,6 +29,10 @@ func (a *App) handleKeys(gtx C) {
 			key.Filter{Name: "Y"}, key.Filter{Name: "D"}, key.Filter{Name: "E"},
 			key.Filter{Name: "W"}, key.Filter{Name: "N"}, key.Filter{Name: "R"},
 			key.Filter{Name: "F", Required: key.ModShift},
+			key.Filter{Name: "X"}, key.Filter{Name: "C"}, key.Filter{Name: "U"},
+			key.Filter{Name: "V"}, key.Filter{Name: "B"},
+			key.Filter{Name: key.NameLeftArrow}, key.Filter{Name: key.NameRightArrow},
+			key.Filter{Name: key.NameSpace},
 			key.Filter{Name: "D", Required: key.ModCtrl},
 			key.Filter{Name: "K", Required: key.ModCtrl},
 			key.Filter{Name: "R", Required: key.ModCtrl},
@@ -59,6 +63,12 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		a.openPalette("")
 	case !nav:
 		return
+	case a.page == xrayPage && e.Name != ":" && e.Name != ";" && e.Name != "N" && e.Name != "0":
+		if e.Name == "B" {
+			a.back()
+			return
+		}
+		a.xray.onKey(e)
 	case e.Name == ":" || e.Name == ";":
 		a.openPalette("")
 	case e.Name == "/":
@@ -99,10 +109,30 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		v.toggleWide()
 	case e.Name == "N":
 		a.pickNamespace()
+	case e.Name == "R" && v.gvr == "v1/nodes":
+		v.drain()
 	case e.Name == "R":
 		v.restart()
 	case e.Name == "F":
 		v.portForward()
+	case e.Name == "X":
+		if v.gvr == "v1/secrets" {
+			v.details(tabData)
+		} else {
+			v.xray()
+		}
+	case e.Name == "C" && v.gvr == "v1/nodes":
+		if r, ok := v.selected(); ok && !nodeCordoned(r) {
+			v.toggleCordon()
+		}
+	case e.Name == "U" && v.gvr == "v1/nodes":
+		if r, ok := v.selected(); ok && nodeCordoned(r) {
+			v.toggleCordon()
+		}
+	case e.Name == "V" && isHelm(v.gvr):
+		v.details(tabValues)
+	case e.Name == "B":
+		a.back()
 	case e.Name == "0":
 		a.setNamespace("")
 	}
@@ -117,8 +147,10 @@ func (a *App) escape(gtx C) {
 		gtx.Execute(key.FocusCmd{})
 	case a.drawer.open:
 		a.drawer.close()
-	case a.view.filter.Len() > 0:
+	case a.page != xrayPage && a.view.filter.Len() > 0:
 		a.view.filter.SetText("")
 		a.view.applyFilter()
+	default:
+		a.back()
 	}
 }

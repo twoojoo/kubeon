@@ -59,6 +59,9 @@ var sections = []navSection{
 		{"Persistent Volumes", "v1/persistentvolumes"},
 		{"Storage Classes", "storage.k8s.io/v1/storageclasses"},
 	}},
+	{"Helm", []navItem{
+		{"Releases", "helm"},
+	}},
 	{"Access Control", []navItem{
 		{"Service Accounts", "v1/serviceaccounts"},
 		{"Roles", "rbac.authorization.k8s.io/v1/roles"},

@@ -18,6 +18,9 @@ func (v *ResourceView) enter() {
 		return
 	}
 	switch v.gvr {
+	case backend.HelmGVR:
+		v.helmHistory()
+		return
 	case "v1/namespaces":
 		v.app.ns = r.Cells[0]
 		v.app.openResource("v1/pods")
@@ -130,7 +133,14 @@ func (v *ResourceView) restart() {
 
 func (v *ResourceView) confirmDelete() {
 	r, ok := v.selected()
-	if !ok || !backend.CanVerb(v.gvr, "delete") {
+	if ok && v.gvr == backend.HelmGVR {
+		a, c, rel := v.app, v.app.cluster, r.ID
+		a.overlay = newConfirm(a, "Uninstall", fmt.Sprintf("Uninstall helm release %s?", rel), true, func(bool) {
+			a.do("Uninstall "+rel, func() error { return c.HelmUninstall(rel) })
+		})
+		return
+	}
+	if !ok || isHelm(v.gvr) || !backend.CanVerb(v.gvr, "delete") {
 		return
 	}
 	a, gvr, path, c := v.app, v.gvr, r.ID, v.app.cluster
@@ -195,7 +205,7 @@ func (a *App) openPalette(prefill string) {
 			return false
 		}
 		switch f[0] {
-		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards":
+		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards", "notify", "notifications", "events", "xray", "helm", "charts", "releases":
 			return true
 		}
 		_, ok := backend.LookupAlias(f[0])
@@ -232,6 +242,25 @@ func (a *App) runCommand(cmd string) {
 		return
 	case "pf", "portforwards":
 		a.pickForward()
+		return
+	case "notify", "notifications", "events":
+		a.overlay = newNotifPanel(a)
+		return
+	case "xray":
+		gvr := a.view.gvr
+		if len(f) > 1 {
+			if g, ok := backend.LookupAlias(f[1]); ok {
+				gvr = g
+			}
+		}
+		if !backend.CanXRay(gvr) {
+			a.flash("xray supports deploy, sts, ds, rs, svc, pods", true)
+			return
+		}
+		a.drill(navState{page: xrayPage, gvr: gvr})
+		return
+	case "helm", "charts", "releases":
+		a.openResource(backend.HelmGVR)
 		return
 	case "q", "quit":
 		if a.w != nil {
@@ -325,5 +354,90 @@ func (a *App) pickForward() {
 	a.overlay = newPicker(a, "Active port-forwards — select to stop", items, false, func(s string) {
 		c.StopPortForward(ids[s])
 		a.flash("Stopped "+s, false)
+	})
+}
+
+func nodeCordoned(r backend.Row) bool {
+	for _, c := range r.Cells {
+		if strings.Contains(c, "SchedulingDisabled") {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *ResourceView) toggleCordon() {
+	r, ok := v.selected()
+	if !ok || v.gvr != "v1/nodes" {
+		return
+	}
+	a, c, node := v.app, v.app.cluster, r.ID
+	on := !nodeCordoned(r)
+	verb := "Cordon"
+	if !on {
+		verb = "Uncordon"
+	}
+	a.overlay = newConfirm(a, verb, fmt.Sprintf("%s node %s?", verb, node), on, func(bool) {
+		a.do(verb+" "+node, func() error { return c.Cordon(node, on) })
+	})
+}
+
+func (v *ResourceView) drain() {
+	r, ok := v.selected()
+	if !ok || v.gvr != "v1/nodes" {
+		return
+	}
+	a, c, node := v.app, v.app.cluster, r.ID
+	cf := newConfirmOpts(a, "Drain", fmt.Sprintf("Cordon %s and evict all its pods?", node), true,
+		[]string{"Ignore DaemonSets", "Delete emptyDir data", "Force (unmanaged pods)"}, []bool{true, false, false},
+		func(o []bool) {
+			a.do("Drain "+node, func() error {
+				out, err := c.Drain(node, backend.DrainOpts{IgnoreDaemonSets: o[0], DeleteEmptyDirData: o[1], Force: o[2], GracePeriodSeconds: -1})
+				if err != nil && out != "" {
+					return fmt.Errorf("%w: %s", err, lastLine(out))
+				}
+				return err
+			})
+		})
+	a.overlay = cf
+}
+
+func lastLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
+func (v *ResourceView) xray() {
+	r, ok := v.selected()
+	if !backend.CanXRay(v.gvr) {
+		return
+	}
+	focus := ""
+	if ok {
+		focus = r.ID
+	}
+	v.app.drill(navState{page: xrayPage, gvr: v.gvr, path: focus})
+}
+
+func (v *ResourceView) helmHistory() {
+	r, ok := v.selected()
+	if !ok || v.gvr != backend.HelmGVR {
+		return
+	}
+	v.app.drill(navState{page: backend.HelmHistoryGVR, gvr: backend.HelmHistoryGVR, path: r.ID})
+}
+
+func (v *ResourceView) rollback() {
+	r, ok := v.selected()
+	if !ok || v.gvr != backend.HelmHistoryGVR {
+		return
+	}
+	a, c := v.app, v.app.cluster
+	rel, rev := backend.SplitHistoryID(r.ID)
+	a.overlay = newConfirm(a, "Rollback", fmt.Sprintf("Roll back %s to revision %s?", rel, rev), false, func(bool) {
+		a.do("Rollback "+rel+" to "+rev, func() error { return c.HelmRollback(rel, rev) })
 	})
 }

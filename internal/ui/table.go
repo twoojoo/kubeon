@@ -33,6 +33,7 @@ type ResourceView struct {
 	app   *App
 	gvr   string
 	ns    string
+	path  string
 	title string
 	watch *backend.TableWatch
 	snap  *backend.Snapshot
@@ -55,6 +56,7 @@ type ResourceView struct {
 	lastFilter string
 	wide       bool
 
+	cordonBtn, drainBtn, xrayBtn, decodeBtn, valuesBtn, historyBtn, rollbackBtn, backBtn      widget.Clickable
 	clearBtn, pfBtn, nsBtn, logsBtn, shellBtn, yamlBtn, descBtn, delBtn, scaleBtn, restartBtn widget.Clickable
 }
 
@@ -66,15 +68,21 @@ func newResourceView(a *App) *ResourceView {
 	return &v
 }
 
-func (v *ResourceView) open(gvr, ns string) {
+func (v *ResourceView) open(gvr, ns string) { v.openPath(gvr, ns, "") }
+
+// openPath opens gvr scoped to an owner path (e.g. helm history).
+func (v *ResourceView) openPath(gvr, ns, path string) {
 	v.close()
-	v.gvr, v.ns = gvr, ns
+	v.gvr, v.ns, v.path = gvr, ns, path
 	v.title = titleFor(gvr)
+	if path != "" {
+		v.title += "  ·  " + path
+	}
 	v.snap, v.sel, v.selID = nil, -1, ""
 	v.widths = nil
 	v.list.Position = layout.Position{}
 	c := v.app.cluster
-	tw := c.Watch(gvr, ns, func(s *backend.Snapshot) {
+	tw := c.WatchPath(gvr, ns, path, func(s *backend.Snapshot) {
 		v.app.post(func() { v.onSnapshot(s) })
 	})
 	v.watch = tw
@@ -225,6 +233,30 @@ func (v *ResourceView) handleToolbar(gtx C) {
 	if v.pfBtn.Clicked(gtx) {
 		v.portForward()
 	}
+	if v.cordonBtn.Clicked(gtx) {
+		v.toggleCordon()
+	}
+	if v.drainBtn.Clicked(gtx) {
+		v.drain()
+	}
+	if v.xrayBtn.Clicked(gtx) {
+		v.xray()
+	}
+	if v.decodeBtn.Clicked(gtx) {
+		v.details(tabData)
+	}
+	if v.valuesBtn.Clicked(gtx) {
+		v.details(tabValues)
+	}
+	if v.historyBtn.Clicked(gtx) {
+		v.helmHistory()
+	}
+	if v.rollbackBtn.Clicked(gtx) {
+		v.rollback()
+	}
+	if v.backBtn.Clicked(gtx) {
+		v.app.back()
+	}
 	if v.scaleBtn.Clicked(gtx) {
 		v.scale()
 	}
@@ -244,6 +276,12 @@ func (v *ResourceView) layoutToolbar(gtx C) D {
 			layout.Rigid(func(gtx C) D {
 				return layout.Inset{Left: 16, Right: 14, Top: 10, Bottom: 8}.Layout(gtx, func(gtx C) D {
 					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx C) D {
+							if len(v.app.navStack) == 0 {
+								return D{}
+							}
+							return layout.Inset{Right: 6}.Layout(gtx, func(gtx C) D { return iconOnly(gtx, &v.backBtn, icBack, 18) })
+						}),
 						layout.Rigid(func(gtx C) D {
 							return rbg(gtx, withAlpha(pal.Accent, 0x30), 7, func(gtx C) D {
 								return inset(6).Layout(gtx, func(gtx C) D { return mdi(gtx, iconFor(v.gvr), pal.Accent, 20) })
@@ -342,14 +380,33 @@ func (v *ResourceView) layoutActions(gtx C) D {
 		}))
 	}
 	isPod := v.gvr == "v1/pods"
+	helm := isHelm(v.gvr)
+	isNode := v.gvr == "v1/nodes"
+	if isNode {
+		ic, txt := icCordon, "Cordon"
+		if nodeCordoned(row) {
+			ic, txt = icUncordon, "Uncordon"
+		}
+		add(&v.cordonBtn, ic, txt, true, false)
+		add(&v.drainBtn, icDrain, "Drain", true, true)
+	}
 	add(&v.logsBtn, icLogs, "Logs", c.IsLoggable(v.gvr), false)
 	add(&v.shellBtn, icTerminal, "Shell", isPod, false)
 	add(&v.pfBtn, icForward, "Forward", canForward(v.gvr), false)
+	add(&v.xrayBtn, icXRay, "XRay", backend.CanXRay(v.gvr), false)
+	add(&v.decodeBtn, icSecret, "Decode", v.gvr == "v1/secrets", false)
+	add(&v.historyBtn, icHistory, "History", v.gvr == backend.HelmGVR, false)
+	add(&v.valuesBtn, icValues, "Values", helm, false)
+	add(&v.rollbackBtn, icRollback, "Rollback", v.gvr == backend.HelmHistoryGVR, true)
 	add(&v.descBtn, icDescribe, "Describe", true, false)
-	add(&v.yamlBtn, icEdit, "YAML", true, false)
+	add(&v.yamlBtn, icEdit, "YAML", !helm, false)
 	add(&v.scaleBtn, icScale, "Scale", c.CanScale(v.gvr), false)
 	add(&v.restartBtn, icRestart, "Restart", c.CanRestart(v.gvr), false)
-	add(&v.delBtn, icDelete, "Delete", backend.CanVerb(v.gvr, "delete"), true)
+	delTxt := "Delete"
+	if v.gvr == backend.HelmGVR {
+		delTxt = "Uninstall"
+	}
+	add(&v.delBtn, icDelete, delTxt, v.gvr == backend.HelmGVR || (!helm && backend.CanVerb(v.gvr, "delete")), true)
 	return bg(gtx, pal.Header, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return layout.Inset{Left: 16, Right: 10, Top: 4, Bottom: 4}.Layout(gtx, func(gtx C) D {
@@ -707,6 +764,14 @@ func notReady(s string) bool {
 }
 
 func titleFor(gvr string) string {
+	switch gvr {
+	case backend.HelmGVR:
+		return "Helm Releases"
+	case backend.HelmHistoryGVR:
+		return "Release History"
+	case "containers":
+		return "Container"
+	}
 	for _, sec := range sections {
 		for _, it := range sec.items {
 			if it.gvr == gvr {

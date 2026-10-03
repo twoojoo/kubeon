@@ -163,6 +163,9 @@ func (c *Cluster) baseContext(ctx context.Context, gvr *client.GVR, ns, path str
 	ctx = context.WithValue(ctx, k9s.KeyFactory, c.factory)
 	ctx = context.WithValue(ctx, k9s.KeyGVR, gvr)
 	ctx = context.WithValue(ctx, k9s.KeyPath, path)
+	if path != "" {
+		ctx = context.WithValue(ctx, k9s.KeyFQN, path)
+	}
 	ctx = context.WithValue(ctx, k9s.KeyNamespace, client.CleanseNamespace(ns))
 	ctx = context.WithValue(ctx, k9s.KeyWithMetrics, c.conn.HasMetrics())
 

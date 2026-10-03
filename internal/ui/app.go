@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/k9desk/internal/notify"
 	"github.com/giovanni/k9desk/internal/safety"
 )
 
@@ -51,16 +53,25 @@ type App struct {
 	statusErr bool
 	statusAt  time.Time
 
-	sidebar *Sidebar
-	view    *ResourceView
-	ovw     *OverviewView
-	page    string // current gvr or overviewGVR
-	drawer  *Drawer
-	dock    *Dock
-	overlay overlay
+	sidebar  *Sidebar
+	view     *ResourceView
+	ovw      *OverviewView
+	xray     *XRayView
+	page     string // current gvr, overviewGVR or xrayPage
+	navStack []navState
+	drawer   *Drawer
+	dock     *Dock
+	overlay  overlay
 
-	ctxBtn widget.Clickable
-	pfBtn  widget.Clickable
+	ctxBtn  widget.Clickable
+	pfBtn   widget.Clickable
+	bellBtn widget.Clickable
+
+	events       []backend.HealthEvent
+	unread       int
+	notifyOn     bool
+	notifier     *notify.Notifier
+	healthCancel context.CancelFunc
 
 	onInvalidate func() // headless harness hook
 }
@@ -85,10 +96,14 @@ func Run(opts Options) error {
 }
 
 func newApp(opts Options, w *app.Window) *App {
-	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w}
+	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true}
+	if w != nil {
+		a.notifier = notify.New("k9desk")
+	}
 	a.sidebar = newSidebar(&a)
 	a.view = newResourceView(&a)
 	a.ovw = newOverview(&a)
+	a.xray = newXRay(&a)
 	a.drawer = newDrawer(&a)
 	a.dock = newDock(&a)
 	return &a
@@ -148,8 +163,12 @@ func (a *App) drain() {
 }
 
 func (a *App) shutdown() {
+	if a.healthCancel != nil {
+		a.healthCancel()
+	}
 	a.view.close()
 	a.ovw.close()
+	a.xray.close()
 	a.dock.closeAll()
 	if a.cluster != nil {
 		a.cluster.Close()
@@ -175,7 +194,7 @@ func (a *App) do(desc string, fn func() error) {
 				a.flash(fmt.Sprintf("%s failed: %v", desc, err), true)
 				return
 			}
-			a.flash(desc+" ✓", false)
+			a.flash(desc+" — done", false)
 		})
 	}()
 }
@@ -187,11 +206,16 @@ func (a *App) connect(kctx string) {
 	}
 	a.view.close()
 	a.ovw.close()
+	a.xray.close()
 	a.dock.closeAll()
 	a.drawer.close()
 	if a.cluster != nil {
 		a.cluster.Close()
 		a.cluster = nil
+	}
+	if a.healthCancel != nil {
+		a.healthCancel()
+		a.healthCancel = nil
 	}
 	a.connecting, a.connErr = kctx, nil
 	go func() {
@@ -213,6 +237,8 @@ func (a *App) connect(kctx string) {
 				return
 			}
 			a.cluster, a.namespaces = c, nss
+			a.events, a.unread = nil, 0
+			a.startHealth(c)
 			a.sidebar.reload(c)
 			res := a.opts.Resource
 			if res == "" {
@@ -239,30 +265,15 @@ func (a *App) refreshNamespaces() {
 	}()
 }
 
+// openResource navigates from the sidebar/palette: resets history.
 func (a *App) openResource(gvr string) {
-	if a.cluster == nil {
-		return
-	}
-	a.drawer.close()
-	a.page = gvr
-	a.sidebar.active = gvr
-	if gvr == overviewGVR {
-		a.view.close()
-		a.view.gvr = ""
-		a.ovw.open(a.ns)
-		return
-	}
-	a.ovw.close()
-	a.view.open(gvr, a.ns)
+	a.navStack = nil
+	a.show(navState{page: gvr, gvr: gvr})
 }
 
 func (a *App) setNamespace(ns string) {
 	a.ns = ns
-	if a.page == overviewGVR {
-		a.ovw.open(ns)
-	} else if a.view.gvr != "" {
-		a.view.open(a.view.gvr, ns)
-	}
+	a.show(a.current())
 }
 
 // textFocused reports whether a text input currently owns the keyboard.
@@ -319,8 +330,18 @@ func (a *App) layoutMain(gtx C) D {
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Flexed(1, func(gtx C) D {
-			if a.page == overviewGVR {
+			switch a.page {
+			case overviewGVR:
 				return a.ovw.Layout(gtx)
+			case xrayPage:
+				if a.drawer.open {
+					return layout.Flex{}.Layout(gtx,
+						layout.Flexed(0.55, a.xray.Layout),
+						layout.Rigid(func(gtx C) D { return vline(gtx, pal.Border) }),
+						layout.Flexed(0.45, a.drawer.Layout),
+					)
+				}
+				return a.xray.Layout(gtx)
 			}
 			if !a.drawer.open {
 				return a.view.Layout(gtx)
@@ -402,6 +423,9 @@ func (a *App) layoutStatus(gtx C) D {
 	if a.pfBtn.Clicked(gtx) {
 		a.pickForward()
 	}
+	if a.bellBtn.Clicked(gtx) {
+		a.overlay = newNotifPanel(a)
+	}
 	return insetHV(10, 0).Layout(gtx, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(center(func(gtx C) D {
@@ -445,6 +469,33 @@ func (a *App) layoutStatus(gtx C) D {
 					})
 				}
 				return iconText(gtx, th, icStatusDone, 12, fg, a.status)
+			})),
+			layout.Rigid(center(func(gtx C) D {
+				if a.cluster == nil {
+					return D{}
+				}
+				return layout.Inset{Right: 6}.Layout(gtx, func(gtx C) D {
+					return a.bellBtn.Layout(gtx, func(gtx C) D {
+						ic := icBell
+						switch {
+						case !a.notifyOn:
+							ic = icBellOff
+						case a.unread > 0:
+							ic = icBellActive
+						}
+						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return mdi(gtx, ic, fg, 16) }),
+							layout.Rigid(func(gtx C) D {
+								if a.unread == 0 {
+									return D{}
+								}
+								return layout.Inset{Left: 3}.Layout(gtx, func(gtx C) D {
+									return badge(gtx, th, itoa(a.unread), pal.TextBright, pal.Err)
+								})
+							}),
+						)
+					})
+				})
 			})),
 			layout.Rigid(center(func(gtx C) D {
 				hints := [][2]string{{":", "command"}, {"/", "filter"}, {"l", "logs"}, {"s", "shell"}, {"d", "describe"}, {"y", "yaml"}, {"^d", "delete"}}

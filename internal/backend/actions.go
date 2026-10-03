@@ -62,8 +62,17 @@ func (c *Cluster) YAML(gvr, path string) (string, error) {
 	return g.ToYAML(path, false)
 }
 
-// Describe returns kubectl-describe output.
+// Describe returns kubectl-describe output (or the DAO's own description,
+// e.g. for helm releases).
 func (c *Cluster) Describe(gvr, path string) (string, error) {
+	if gvr == HelmGVR || gvr == HelmHistoryGVR {
+		return c.HelmDescribe(path)
+	}
+	if !strings.Contains(gvr, "/") {
+		if d, ok := c.Accessor(gvr).(dao.Describer); ok {
+			return d.Describe(path)
+		}
+	}
 	return dao.Describe(c.conn, client.NewGVR(gvr), path)
 }
 
@@ -197,6 +206,7 @@ func (c *Cluster) IsLoggable(gvr string) bool {
 
 // LogLine is one log line.
 type LogLine struct {
+	Pod       string // set for multi-pod streams
 	Container string
 	Text      string
 	IsError   bool

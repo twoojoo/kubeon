@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,12 +29,15 @@ func batchLogs(ctx context.Context, in <-chan *dao.LogItem, showTime bool, out f
 			if it == nil || it == dao.ItemEOF || it.IsEmpty() {
 				continue
 			}
-			txt := strings.TrimRight(string(it.Bytes), "\r\n")
+			txt := unescapeTview(strings.TrimRight(string(it.Bytes), "\r\n"))
+			if it.IsError {
+				txt = stripTags(txt)
+			}
 			for _, l := range strings.Split(txt, "\n") {
 				if !showTime {
 					l = stripTimestamp(l)
 				}
-				buf = append(buf, LogLine{Container: it.Container, Text: l, IsError: it.IsError})
+				buf = append(buf, LogLine{Pod: it.Pod, Container: it.Container, Text: l, IsError: it.IsError})
 			}
 			if len(buf) >= 4096 {
 				flush()
@@ -54,4 +58,14 @@ func stripTimestamp(l string) string {
 		return l
 	}
 	return l[i+1:]
+}
+
+// k9s escapes log bytes for tview ("[foo]" → "[foo[]"); undo it.
+var tviewEscRx = regexp.MustCompile(`\[([a-zA-Z0-9_,;: \-\."#]+)\[\]`)
+
+func unescapeTview(s string) string {
+	if !strings.Contains(s, "[]") {
+		return s
+	}
+	return tviewEscRx.ReplaceAllString(s, "[$1]")
 }

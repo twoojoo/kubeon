@@ -228,18 +228,33 @@ func (p *Picker) Layout(gtx C) D {
 	})
 }
 
-// Confirm is a yes/no modal; danger dialogs offer a "force" option.
+// Confirm is a yes/no modal with optional boolean options.
 type Confirm struct {
-	app            *App
-	title, msg     string
-	danger, force  bool
-	onOK           func(force bool)
-	done           bool
-	ok, cancel, fb widget.Clickable
+	app        *App
+	title, msg string
+	danger     bool
+	optLabels  []string
+	opts       []bool
+	optBtns    []widget.Clickable
+	onOK       func(opts []bool)
+	done       bool
+	ok, cancel widget.Clickable
 }
 
+// newConfirm: danger dialogs offer a single "force" option.
 func newConfirm(a *App, title, msg string, danger bool, onOK func(bool)) *Confirm {
-	return &Confirm{app: a, title: title, msg: msg, danger: danger, onOK: onOK}
+	var labels []string
+	if danger && title == "Delete" {
+		labels = []string{"Force (grace 0)"}
+	}
+	return newConfirmOpts(a, title, msg, danger, labels, make([]bool, len(labels)), func(o []bool) {
+		onOK(len(o) > 0 && o[0])
+	})
+}
+
+func newConfirmOpts(a *App, title, msg string, danger bool, labels []string, defaults []bool, onOK func([]bool)) *Confirm {
+	return &Confirm{app: a, title: title, msg: msg, danger: danger, optLabels: labels,
+		opts: append([]bool(nil), defaults...), optBtns: make([]widget.Clickable, len(labels)), onOK: onOK}
 }
 
 func (c *Confirm) Done() bool { return c.done }
@@ -253,18 +268,20 @@ func (c *Confirm) Layout(gtx C) D {
 		}
 		if e, ok := ev.(key.Event); ok && e.State == key.Press {
 			c.done = true
-			c.onOK(c.force)
+			c.onOK(c.opts)
 		}
 	}
 	if c.ok.Clicked(gtx) {
 		c.done = true
-		c.onOK(c.force)
+		c.onOK(c.opts)
 	}
 	if c.cancel.Clicked(gtx) {
 		c.done = true
 	}
-	if c.fb.Clicked(gtx) {
-		c.force = !c.force
+	for i := range c.optBtns {
+		if c.optBtns[i].Clicked(gtx) {
+			c.opts[i] = !c.opts[i]
+		}
 	}
 	w := min(gtx.Dp(460), gtx.Constraints.Max.X-gtx.Dp(40))
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
@@ -294,15 +311,24 @@ func (c *Confirm) Layout(gtx C) D {
 							l.Color = pal.Text
 							return l.Layout(gtx)
 						}),
+						layout.Rigid(func(gtx C) D {
+							if len(c.optLabels) == 0 {
+								return D{}
+							}
+							var ch []layout.FlexChild
+							for i := range c.optLabels {
+								i := i
+								ch = append(ch, layout.Rigid(func(gtx C) D {
+									return toggle(gtx, th, &c.optBtns[i], c.optLabels[i], c.opts[i])
+								}))
+							}
+							return layout.Inset{Top: 12}.Layout(gtx, func(gtx C) D {
+								return layout.Flex{Axis: layout.Vertical}.Layout(gtx, ch...)
+							})
+						}),
 						layout.Rigid(layout.Spacer{Height: 16}.Layout),
 						layout.Rigid(func(gtx C) D {
 							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-								layout.Rigid(func(gtx C) D {
-									if !c.danger {
-										return D{}
-									}
-									return toggle(gtx, th, &c.fb, "Force (grace 0)", c.force)
-								}),
 								layout.Flexed(1, layout.Spacer{}.Layout),
 								layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &c.cancel, nil, "Cancel", pal.Text, pal.Hover) }),
 								layout.Rigid(layout.Spacer{Width: 8}.Layout),

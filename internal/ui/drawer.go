@@ -1,17 +1,31 @@
 package ui
 
 import (
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"gioui.org/io/clipboard"
 	"gioui.org/layout"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+
+	"github.com/giovanni/k9desk/internal/backend"
 )
 
 const (
 	tabDescribe = iota
 	tabYAML
+	tabData   // decoded secret data
+	tabValues // helm values
+	tabCount
 )
 
-// Drawer is the right-hand details panel (describe / YAML with editing).
+var tabNames = [tabCount]string{"Describe", "YAML", "Data", "Values"}
+
+// Drawer is the right-hand details panel: describe, YAML (editable),
+// decoded secret data, helm values.
 type Drawer struct {
 	app       *App
 	open      bool
@@ -26,16 +40,51 @@ type Drawer struct {
 
 	describe widget.Editor
 	yaml     widget.Editor
+	values   widget.Editor
 
-	tabBtns                               [2]widget.Clickable
+	secret     []backend.SecretEntry
+	revealed   map[string]bool
+	revealAll  bool
+	secretList widget.List
+	keyCopy    map[string]*widget.Clickable
+	keyEye     map[string]*widget.Clickable
+	allValues  bool
+
+	tabBtns                               [tabCount]widget.Clickable
 	closeBtn, editBtn, saveBtn, revertBtn widget.Clickable
+	revealBtn, envBtn, dlBtn, allValBtn   widget.Clickable
 }
 
 func newDrawer(a *App) *Drawer {
-	d := Drawer{app: a}
+	d := Drawer{app: a, revealed: map[string]bool{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
 	d.describe.ReadOnly = true
 	d.yaml.ReadOnly = true
+	d.values.ReadOnly = true
+	d.secretList.Axis = layout.Vertical
 	return &d
+}
+
+func isHelm(gvr string) bool { return gvr == backend.HelmGVR || gvr == backend.HelmHistoryGVR }
+
+// tabs lists the tabs available for the current resource.
+func (d *Drawer) tabs() []int {
+	switch {
+	case isHelm(d.gvr):
+		return []int{tabDescribe, tabValues}
+	case d.gvr == "v1/secrets":
+		return []int{tabData, tabDescribe, tabYAML}
+	default:
+		return []int{tabDescribe, tabYAML}
+	}
+}
+
+func (d *Drawer) hasTab(t int) bool {
+	for _, x := range d.tabs() {
+		if x == t {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *Drawer) focused(gtx C) bool {
@@ -43,12 +92,17 @@ func (d *Drawer) focused(gtx C) bool {
 }
 
 func (d *Drawer) show(gvr, path string, tab int, edit bool) {
-	d.open, d.tab = true, tab
+	d.open = true
 	if d.gvr != gvr || d.path != path {
 		d.gvr, d.path = gvr, path
+		d.revealed, d.revealAll = map[string]bool{}, false
 		d.load()
 	}
-	d.setEditing(edit)
+	if !d.hasTab(tab) {
+		tab = d.tabs()[0]
+	}
+	d.tab = tab
+	d.setEditing(edit && d.hasTab(tabYAML))
 }
 
 // follow tracks table selection while not editing.
@@ -59,13 +113,18 @@ func (d *Drawer) follow(gvr, path string) {
 	d.setEditing(false)
 	if d.gvr != gvr || d.path != path {
 		d.gvr, d.path = gvr, path
+		d.revealed, d.revealAll = map[string]bool{}, false
 		d.load()
+		if !d.hasTab(d.tab) {
+			d.tab = d.tabs()[0]
+		}
 	}
 }
 
 func (d *Drawer) close() {
 	d.open, d.editing, d.dirty = false, false, false
 	d.gvr, d.path = "", ""
+	d.secret = nil
 }
 
 func (d *Drawer) setEditing(on bool) {
@@ -82,11 +141,23 @@ func (d *Drawer) load() {
 		return
 	}
 	d.seq++
-	seq, gvr, path := d.seq, d.gvr, d.path
+	seq, gvr, path, all := d.seq, d.gvr, d.path, d.allValues
 	d.loading, d.errMsg, d.dirty = true, "", false
 	go func() {
 		desc, derr := c.Describe(gvr, path)
-		y, yerr := c.YAML(gvr, path)
+		var (
+			y, vals string
+			yerr    error
+			sec     []backend.SecretEntry
+		)
+		if isHelm(gvr) {
+			vals, yerr = c.HelmValues(path, all)
+		} else {
+			y, yerr = c.YAML(gvr, path)
+		}
+		if gvr == "v1/secrets" {
+			sec, _ = c.SecretData(path)
+		}
 		d.app.post(func() {
 			if seq != d.seq {
 				return
@@ -100,7 +171,12 @@ func (d *Drawer) load() {
 			}
 			d.describe.SetText(desc)
 			d.yaml.SetText(y)
+			if strings.TrimSpace(vals) == "" || strings.TrimSpace(vals) == "{}" {
+				vals = "# no user-supplied values"
+			}
+			d.values.SetText(vals)
 			d.original = y
+			d.secret = sec
 		})
 	}()
 }
@@ -118,6 +194,36 @@ func (d *Drawer) save() {
 		})
 		return nil
 	})
+}
+
+func (d *Drawer) clickFor(m map[string]*widget.Clickable, k string) *widget.Clickable {
+	c, ok := m[k]
+	if !ok {
+		c = new(widget.Clickable)
+		m[k] = c
+	}
+	return c
+}
+
+// secretEnv renders the secret as KEY=value lines (binary values base64-free skipped).
+func secretEnv(ee []backend.SecretEntry) string {
+	var b strings.Builder
+	for _, e := range ee {
+		if e.Binary {
+			continue
+		}
+		k := strings.ToUpper(strings.NewReplacer(".", "_", "-", "_").Replace(e.Key))
+		v := string(e.Value)
+		if strings.ContainsAny(v, " \n\"'$#") {
+			v = "'" + strings.ReplaceAll(v, "'", `'\''`) + "'"
+		}
+		b.WriteString(k + "=" + v + "\n")
+	}
+	return b.String()
+}
+
+func copyText(gtx C, s string) {
+	gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(s))})
 }
 
 // Layout draws the drawer.
@@ -143,6 +249,21 @@ func (d *Drawer) Layout(gtx C) D {
 	if d.saveBtn.Clicked(gtx) {
 		d.save()
 	}
+	if d.revealBtn.Clicked(gtx) {
+		d.revealAll = !d.revealAll
+		d.revealed = map[string]bool{}
+	}
+	if d.envBtn.Clicked(gtx) {
+		copyText(gtx, secretEnv(d.secret))
+		d.app.flash("Secret copied as .env ("+itoa(len(d.secret))+" keys)", false)
+	}
+	if d.dlBtn.Clicked(gtx) {
+		d.downloadSecret()
+	}
+	if d.allValBtn.Clicked(gtx) {
+		d.allValues = !d.allValues
+		d.load()
+	}
 	for {
 		ev, ok := d.yaml.Update(gtx)
 		if !ok {
@@ -153,6 +274,13 @@ func (d *Drawer) Layout(gtx C) D {
 		}
 	}
 	fill(gtx, pal.Panel)
+	var tabItems []layout.FlexChild
+	for _, t := range d.tabs() {
+		t := t
+		tabItems = append(tabItems, layout.Rigid(func(gtx C) D { return d.tabButton(gtx, t) }))
+	}
+	tabItems = append(tabItems, layout.Flexed(1, layout.Spacer{}.Layout), layout.Rigid(d.layoutTabActions))
+
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx C) D {
 			return bg(gtx, pal.Header, func(gtx C) D {
@@ -175,30 +303,7 @@ func (d *Drawer) Layout(gtx C) D {
 		}),
 		layout.Rigid(func(gtx C) D {
 			return insetHV(8, 4).Layout(gtx, func(gtx C) D {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(func(gtx C) D { return d.tabButton(gtx, 0, "Describe") }),
-					layout.Rigid(func(gtx C) D { return d.tabButton(gtx, 1, "YAML") }),
-					layout.Flexed(1, layout.Spacer{}.Layout),
-					layout.Rigid(func(gtx C) D {
-						if d.tab != tabYAML {
-							return D{}
-						}
-						if !d.editing {
-							return pillButton(gtx, th, &d.editBtn, icEdit, "Edit", pal.Text, colorNRGBA{})
-						}
-						return layout.Flex{}.Layout(gtx,
-							layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.revertBtn, icClose, "Cancel", pal.Text, colorNRGBA{}) }),
-							layout.Rigid(layout.Spacer{Width: 6}.Layout),
-							layout.Rigid(func(gtx C) D {
-								c := pal.Accent
-								if !d.dirty {
-									c = pal.Border
-								}
-								return pillButton(gtx, th, &d.saveBtn, icStatusDone, "Save & Apply", pal.TextBright, c)
-							}),
-						)
-					}),
-				)
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, tabItems...)
 			})
 		}),
 		layout.Rigid(func(gtx C) D { return hline(gtx, pal.Border) }),
@@ -209,19 +314,25 @@ func (d *Drawer) Layout(gtx C) D {
 				})
 			}
 			gtx.Constraints.Min = gtx.Constraints.Max
+			if d.tab == tabData {
+				return d.layoutSecret(gtx)
+			}
 			if d.editing {
 				fill(gtx, pal.Bg)
 			}
 			return inset(10).Layout(gtx, func(gtx C) D {
 				ed := &d.describe
-				if d.tab == tabYAML {
+				switch d.tab {
+				case tabYAML:
 					ed = &d.yaml
+				case tabValues:
+					ed = &d.values
 				}
 				e := material.Editor(th, ed, "")
 				e.Font = fontMono
 				e.TextSize = 12
 				e.Color = pal.Text
-				if d.tab == tabYAML && d.errMsg != "" {
+				if (d.tab == tabYAML || d.tab == tabValues) && d.errMsg != "" {
 					e.Hint = d.errMsg
 				}
 				return e.Layout(gtx)
@@ -230,20 +341,145 @@ func (d *Drawer) Layout(gtx C) D {
 	)
 }
 
-func (d *Drawer) tabButton(gtx C, i int, txt string) D {
+func (d *Drawer) layoutTabActions(gtx C) D {
+	th := d.app.th
+	switch d.tab {
+	case tabYAML:
+		if !d.editing {
+			return pillButton(gtx, th, &d.editBtn, icEdit, "Edit", pal.Text, colorNRGBA{})
+		}
+		return layout.Flex{}.Layout(gtx,
+			layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.revertBtn, icClose, "Cancel", pal.Text, colorNRGBA{}) }),
+			layout.Rigid(layout.Spacer{Width: 6}.Layout),
+			layout.Rigid(func(gtx C) D {
+				c := pal.Accent
+				if !d.dirty {
+					c = pal.Border
+				}
+				return pillButton(gtx, th, &d.saveBtn, icStatusDone, "Save & Apply", pal.TextBright, c)
+			}),
+		)
+	case tabData:
+		ic, txt := icEye, "Reveal"
+		if d.revealAll {
+			ic, txt = icEyeOff, "Hide"
+		}
+		return layout.Flex{}.Layout(gtx,
+			layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.revealBtn, ic, txt, pal.Text, colorNRGBA{}) }),
+			layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.envBtn, icCopyText, "Copy .env", pal.Text, colorNRGBA{}) }),
+			layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.dlBtn, icDownload, "Download", pal.Text, colorNRGBA{}) }),
+		)
+	case tabValues:
+		return toggle(gtx, th, &d.allValBtn, "Computed (all) values", d.allValues)
+	}
+	return D{}
+}
+
+func (d *Drawer) layoutSecret(gtx C) D {
+	th := d.app.th
+	if len(d.secret) == 0 {
+		return layout.Center.Layout(gtx, func(gtx C) D {
+			return lbl(gtx, th, fontSans, 13, pal.TextDim, "Secret has no data")
+		})
+	}
+	return inset(10).Layout(gtx, func(gtx C) D {
+		return material.List(th, &d.secretList).Layout(gtx, len(d.secret), func(gtx C, i int) D {
+			e := d.secret[i]
+			eye, cp := d.clickFor(d.keyEye, e.Key), d.clickFor(d.keyCopy, e.Key)
+			if eye.Clicked(gtx) {
+				d.revealed[e.Key] = !d.shown(e.Key)
+			}
+			if cp.Clicked(gtx) {
+				copyText(gtx, string(e.Value))
+				d.app.flash("Copied "+e.Key+" to clipboard", false)
+			}
+			shown := d.shown(e.Key)
+			return layout.Inset{Bottom: 8}.Layout(gtx, func(gtx C) D {
+				return rbg(gtx, pal.Bg, 8, func(gtx C) D {
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
+					return inset(10).Layout(gtx, func(gtx C) D {
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							layout.Rigid(func(gtx C) D {
+								return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+									layout.Rigid(func(gtx C) D { return mdi(gtx, icSecret, pal.Warn, 15) }),
+									layout.Rigid(layout.Spacer{Width: 8}.Layout),
+									layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontMono, 13, pal.TextBright, e.Key) }),
+									layout.Rigid(func(gtx C) D {
+										return badge(gtx, th, itoa(len(e.Value))+" B", pal.TextDim, pal.Panel)
+									}),
+									layout.Rigid(layout.Spacer{Width: 6}.Layout),
+									layout.Rigid(func(gtx C) D {
+										ic := icEye
+										if shown {
+											ic = icEyeOff
+										}
+										return iconOnly(gtx, eye, ic, 15)
+									}),
+									layout.Rigid(func(gtx C) D { return iconOnly(gtx, cp, icCopyText, 15) }),
+								)
+							}),
+							layout.Rigid(layout.Spacer{Height: 6}.Layout),
+							layout.Rigid(func(gtx C) D {
+								v := "••••••••••••"
+								c := pal.TextDim
+								switch {
+								case e.Binary && shown:
+									v = "<binary data, " + itoa(len(e.Value)) + " bytes>"
+								case shown:
+									v, c = string(e.Value), pal.Ok
+								}
+								l := material.Body2(th, v)
+								l.Font = fontMono
+								l.TextSize = 12
+								l.Color = c
+								l.MaxLines = 12
+								return l.Layout(gtx)
+							}),
+						)
+					})
+				})
+			})
+		})
+	})
+}
+
+func (d *Drawer) shown(k string) bool {
+	if v, ok := d.revealed[k]; ok {
+		return v
+	}
+	return d.revealAll
+}
+
+func (d *Drawer) downloadSecret() {
+	dir := downloadsDir()
+	name := strings.ReplaceAll(d.path, "/", "_") + ".env"
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, []byte(secretEnv(d.secret)), 0o600); err != nil {
+		d.app.flash("download failed: "+err.Error(), true)
+		return
+	}
+	d.app.flash("Saved "+p+" (mode 600)", false)
+}
+
+func (d *Drawer) tabButton(gtx C, i int) D {
 	th := d.app.th
 	active := d.tab == i
 	cl := &d.tabBtns[i]
 	ic := icDescribe
-	if i == tabYAML {
+	switch i {
+	case tabYAML:
 		ic = icYAML
+	case tabData:
+		ic = icSecret
+	case tabValues:
+		ic = icValues
 	}
 	dims := cl.Layout(gtx, func(gtx C) D {
 		c := pal.TextDim
 		if active || cl.Hovered() {
 			c = pal.TextBright
 		}
-		return insetHV(10, 7).Layout(gtx, func(gtx C) D { return iconText(gtx, th, ic, 13, c, txt) })
+		return insetHV(10, 7).Layout(gtx, func(gtx C) D { return iconText(gtx, th, ic, 13, c, tabNames[i]) })
 	})
 	if active {
 		fillRRect(gtx, pal.Accent, rect(gtx.Dp(6), dims.Size.Y-gtx.Dp(2), dims.Size.X-gtx.Dp(6), dims.Size.Y), gtx.Dp(1))

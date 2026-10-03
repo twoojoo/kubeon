@@ -2,45 +2,80 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"image"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"gioui.org/io/clipboard"
 	"gioui.org/layout"
+	"gioui.org/op/clip"
+	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"gioui.org/x/richtext"
 
 	"github.com/giovanni/k9desk/internal/backend"
 )
 
 const maxLogLines = 200_000
 
-// LogView streams logs (k9s dao TailLogs) into a virtualized list.
+// Log levels detected from JSON fields, logfmt or plain text.
+const (
+	lvlUnknown uint8 = iota
+	lvlDebug
+	lvlInfo
+	lvlWarn
+	lvlError
+)
+
+var levelNames = map[uint8]string{lvlDebug: "DEBUG", lvlInfo: "INFO", lvlWarn: "WARN", lvlError: "ERROR"}
+
+// logEntry is a log line plus parsed structure.
+type logEntry struct {
+	backend.LogLine
+	level  uint8
+	json   bool
+	time   string
+	msg    string
+	fields string // remaining JSON fields as k=v
+}
+
+// LogView streams logs (k9s dao TailLogs) into a virtualized list, with
+// multi-pod prefixes, JSON pretty-printing, level filtering and export.
 type LogView struct {
 	app       *App
 	gvr, path string
 	previous  bool
 	cancel    context.CancelFunc
 
-	lines    []backend.LogLine
-	multi    bool
-	filtered []int // indices into lines when filtering
+	lines    []logEntry
+	multiCo  bool
+	multiPod bool
+	filtered []int
+	filterOn bool
 	rx       *regexp.Regexp
 	rawQ     string
+	minLevel uint8
 	err      string
 
 	list   widget.List
 	filter widget.Editor
+	rt     richtext.InteractiveText
 
-	wrap, timestamps, allContainers bool
+	wrap, timestamps, allContainers, pretty bool
 
-	followBtn, wrapBtn, tsBtn, clearBtn, copyBtn, allBtn widget.Clickable
+	followBtn, wrapBtn, tsBtn, clearBtn, copyBtn, allBtn, jsonBtn, lvlBtn, dlBtn widget.Clickable
 }
 
 func newLogView(a *App, gvr, path string, previous bool) *LogView {
-	l := LogView{app: a, gvr: gvr, path: path, previous: previous, wrap: true, allContainers: true}
+	l := LogView{app: a, gvr: gvr, path: path, previous: previous, wrap: true, allContainers: true, pretty: true}
 	l.list.Axis = layout.Vertical
 	l.list.ScrollToEnd = true
 	l.filter.SingleLine = true
@@ -50,6 +85,9 @@ func newLogView(a *App, gvr, path string, previous bool) *LogView {
 
 func (l *LogView) Title() string {
 	t := "Logs " + shortName(l.path)
+	if l.gvr != "v1/pods" {
+		t = "Logs " + titleFor(l.gvr) + "/" + shortName(l.path)
+	}
 	if l.previous {
 		t += " (prev)"
 	}
@@ -68,7 +106,7 @@ func (l *LogView) Close() {
 
 func (l *LogView) start() {
 	l.Close()
-	l.lines, l.filtered, l.err = l.lines[:0], nil, ""
+	l.lines, l.filtered, l.err = l.lines[:0], l.filtered[:0], ""
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
 	c := l.app.cluster
@@ -87,18 +125,95 @@ func (l *LogView) start() {
 	}()
 }
 
-func (l *LogView) append(batch []backend.LogLine) {
-	base := len(l.lines)
-	l.lines = append(l.lines, batch...)
-	for i := range batch {
-		if batch[i].Container != "" && len(l.lines) > 0 && batch[i].Container != l.lines[0].Container {
-			l.multi = true
+var (
+	plainLevelRx  = regexp.MustCompile(`(?i)\b(?:level|lvl|severity)[=:]\s*"?(debug|info|warn|warning|error|fatal|panic|critical|trace)\b|\b(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|PANIC|TRACE)\b`)
+	jsonLevelKeys = []string{"level", "lvl", "severity", "log.level", "loglevel"}
+	jsonMsgKeys   = []string{"msg", "message", "log", "event"}
+	jsonTimeKeys  = []string{"time", "ts", "timestamp", "@timestamp", "t"}
+)
+
+func parseLevel(s string) uint8 {
+	switch strings.ToLower(s) {
+	case "debug", "trace", "dbg":
+		return lvlDebug
+	case "info", "information", "notice":
+		return lvlInfo
+	case "warn", "warning":
+		return lvlWarn
+	case "error", "err", "fatal", "panic", "critical", "crit", "emerg", "alert":
+		return lvlError
+	}
+	return lvlUnknown
+}
+
+func parseEntry(ln backend.LogLine) logEntry {
+	e := logEntry{LogLine: ln}
+	t := strings.TrimSpace(ln.Text)
+	if strings.HasPrefix(t, "{") && strings.HasSuffix(t, "}") {
+		var m map[string]any
+		if json.Unmarshal([]byte(t), &m) == nil {
+			e.json = true
+			take := func(keys []string) string {
+				for _, k := range keys {
+					if v, ok := m[k]; ok {
+						delete(m, k)
+						return fmt.Sprint(v)
+					}
+				}
+				return ""
+			}
+			e.level = parseLevel(take(jsonLevelKeys))
+			e.msg = take(jsonMsgKeys)
+			e.time = take(jsonTimeKeys)
+			keys := make([]string, 0, len(m))
+			for k := range m {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			var b strings.Builder
+			for _, k := range keys {
+				v, _ := json.Marshal(m[k])
+				vs := string(v)
+				if s, ok := m[k].(string); ok && !strings.ContainsAny(s, " \t\"") {
+					vs = s
+				}
+				fmt.Fprintf(&b, " %s=%s", k, vs)
+			}
+			e.fields = b.String()
+			return e
 		}
 	}
-	if l.rx != nil {
-		for i := range batch {
-			if l.rx.MatchString(batch[i].Text) {
-				l.filtered = append(l.filtered, base+i)
+	if mm := plainLevelRx.FindStringSubmatch(t); mm != nil {
+		e.level = parseLevel(mm[1] + mm[2])
+	}
+	if ln.IsError {
+		e.level = lvlError
+	}
+	return e
+}
+
+func (l *LogView) match(e *logEntry) bool {
+	if l.minLevel > 0 && e.level < l.minLevel {
+		return false
+	}
+	return l.rx == nil || l.rx.MatchString(e.Text)
+}
+
+func (l *LogView) append(batch []backend.LogLine) {
+	base := len(l.lines)
+	for _, ln := range batch {
+		l.lines = append(l.lines, parseEntry(ln))
+		if ln.Pod != "" && len(l.lines) > 0 && ln.Pod != l.lines[0].Pod {
+			l.multiPod = true
+		}
+		if ln.Container != "" && ln.Container != l.lines[0].Container {
+			l.multiCo = true
+		}
+	}
+	if l.filterOn {
+		for i := base; i < len(l.lines); i++ {
+			if l.match(&l.lines[i]) {
+				l.filtered = append(l.filtered, i)
 			}
 		}
 	}
@@ -127,31 +242,59 @@ func (l *LogView) setFilter(q string) {
 
 func (l *LogView) rebuildFilter() {
 	l.filtered = l.filtered[:0]
-	if l.rx == nil {
+	l.filterOn = l.rx != nil || l.minLevel > 0
+	if !l.filterOn {
 		return
 	}
 	for i := range l.lines {
-		if l.rx.MatchString(l.lines[i].Text) {
+		if l.match(&l.lines[i]) {
 			l.filtered = append(l.filtered, i)
 		}
 	}
 }
 
 func (l *LogView) count() int {
-	if l.rx != nil {
+	if l.filterOn {
 		return len(l.filtered)
 	}
 	return len(l.lines)
 }
 
-func (l *LogView) at(i int) *backend.LogLine {
-	if l.rx != nil {
+func (l *LogView) at(i int) *logEntry {
+	if l.filterOn {
 		return &l.lines[l.filtered[i]]
 	}
 	return &l.lines[i]
 }
 
 func (l *LogView) following() bool { return !l.list.Position.BeforeEnd }
+
+// export renders the visible (filtered) lines as plain text.
+func (l *LogView) export() string {
+	var b strings.Builder
+	for i := 0; i < l.count(); i++ {
+		e := l.at(i)
+		if l.multiPod && e.Pod != "" {
+			b.WriteString("[" + e.Pod + "] ")
+		}
+		if l.multiCo && e.Container != "" {
+			b.WriteString("[" + e.Container + "] ")
+		}
+		b.WriteString(e.Text)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func (l *LogView) download() {
+	name := fmt.Sprintf("%s-%s.log", strings.ReplaceAll(l.path, "/", "_"), time.Now().Format("20060102-150405"))
+	p := filepath.Join(downloadsDir(), name)
+	if err := os.WriteFile(p, []byte(l.export()), 0o644); err != nil {
+		l.app.flash("download failed: "+err.Error(), true)
+		return
+	}
+	l.app.flash(fmt.Sprintf("Saved %d lines to %s", l.count(), p), false)
+}
 
 func (l *LogView) Layout(gtx C) D {
 	th := l.app.th
@@ -171,6 +314,20 @@ func (l *LogView) Layout(gtx C) D {
 	if l.wrapBtn.Clicked(gtx) {
 		l.wrap = !l.wrap
 	}
+	if l.jsonBtn.Clicked(gtx) {
+		l.pretty = !l.pretty
+	}
+	if l.lvlBtn.Clicked(gtx) {
+		switch l.minLevel {
+		case lvlUnknown:
+			l.minLevel = lvlWarn
+		case lvlWarn:
+			l.minLevel = lvlError
+		default:
+			l.minLevel = lvlUnknown
+		}
+		l.rebuildFilter()
+	}
 	if l.tsBtn.Clicked(gtx) {
 		l.timestamps = !l.timestamps
 		l.start()
@@ -183,13 +340,11 @@ func (l *LogView) Layout(gtx C) D {
 		l.lines, l.filtered = l.lines[:0], l.filtered[:0]
 	}
 	if l.copyBtn.Clicked(gtx) {
-		var b strings.Builder
-		for i := 0; i < l.count(); i++ {
-			b.WriteString(l.at(i).Text)
-			b.WriteByte('\n')
-		}
-		gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(b.String()))})
+		gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(l.export()))})
 		l.app.flash("Logs copied to clipboard", false)
+	}
+	if l.dlBtn.Clicked(gtx) {
+		l.download()
 	}
 
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -197,7 +352,7 @@ func (l *LogView) Layout(gtx C) D {
 			return insetHV(8, 4).Layout(gtx, func(gtx C) D {
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 					layout.Rigid(func(gtx C) D {
-						gtx.Constraints.Max.X = gtx.Dp(260)
+						gtx.Constraints.Max.X = gtx.Dp(240)
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
 						b := pal.Border
 						if gtx.Focused(&l.filter) {
@@ -218,19 +373,23 @@ func (l *LogView) Layout(gtx C) D {
 							})
 						})
 					}),
-					layout.Rigid(layout.Spacer{Width: 8}.Layout),
-					layout.Rigid(func(gtx C) D {
-						return toggle(gtx, th, &l.followBtn, "Follow", l.following())
-					}),
+					layout.Rigid(layout.Spacer{Width: 6}.Layout),
+					layout.Rigid(func(gtx C) D { return l.levelButton(gtx) }),
+					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.followBtn, "Follow", l.following()) }),
 					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.wrapBtn, "Wrap", l.wrap) }),
-					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.tsBtn, "Timestamps", l.timestamps) }),
+					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.jsonBtn, "JSON", l.pretty) }),
+					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.tsBtn, "Time", l.timestamps) }),
 					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.allBtn, "All containers", l.allContainers) }),
-					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.clearBtn, icClear, "Clear", pal.TextDim, colorNRGBA{}) }),
-					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.copyBtn, icCopy, "Copy", pal.TextDim, colorNRGBA{}) }),
+					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.clearBtn, icClear, "", pal.TextDim, colorNRGBA{}) }),
+					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.copyBtn, icCopyText, "", pal.TextDim, colorNRGBA{}) }),
+					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.dlBtn, icDownload, "", pal.TextDim, colorNRGBA{}) }),
 					layout.Flexed(1, func(gtx C) D {
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
 						return layout.E.Layout(gtx, func(gtx C) D {
 							msg := itoa(l.count()) + " lines"
+							if l.filterOn {
+								msg += " / " + itoa(len(l.lines))
+							}
 							c := pal.TextDim
 							if l.err != "" {
 								msg, c = l.err, pal.Err
@@ -252,29 +411,98 @@ func (l *LogView) Layout(gtx C) D {
 	)
 }
 
-func (l *LogView) layoutLine(gtx C, ln *backend.LogLine) D {
+func (l *LogView) levelButton(gtx C) D {
 	th := l.app.th
-	c := pal.Text
-	if ln.IsError {
-		c = pal.Err
+	txt, c := "All levels", pal.TextDim
+	switch l.minLevel {
+	case lvlWarn:
+		txt, c = "Warn+", pal.Warn
+	case lvlError:
+		txt, c = "Errors", pal.Err
 	}
-	lw := widget.Label{}
-	if !l.wrap {
-		lw.MaxLines = 1
-		lw.Truncator = "…"
+	return pillButton(gtx, th, &l.lvlBtn, icFilter, txt, c, colorNRGBA{})
+}
+
+func levelColor(lv uint8) colorNRGBA {
+	switch lv {
+	case lvlDebug:
+		return pal.TextDim
+	case lvlInfo:
+		return pal.Info
+	case lvlWarn:
+		return pal.Warn
+	case lvlError:
+		return pal.Err
 	}
-	txt := ln.Text
-	if l.multi && ln.Container != "" {
-		return layout.Flex{}.Layout(gtx,
-			layout.Rigid(func(gtx C) D {
-				return lbl(gtx, th, fontMono, 12, containerColor(ln.Container), ln.Container+" ")
-			}),
-			layout.Flexed(1, func(gtx C) D {
-				return lw.Layout(gtx, th.Shaper, fontMono, 12, txt, colorMat(gtx, c))
-			}),
-		)
+	return pal.Text
+}
+
+func (l *LogView) layoutLine(gtx C, e *logEntry) D {
+	th := l.app.th
+	const size = unit.Sp(12)
+	var spans []richtext.SpanStyle
+	add := func(s string, c colorNRGBA) {
+		if s != "" {
+			spans = append(spans, richtext.SpanStyle{Font: fontMono, Size: size, Color: c, Content: s})
+		}
 	}
-	return lw.Layout(gtx, th.Shaper, fontMono, 12, txt, colorMat(gtx, c))
+	if l.multiPod && e.Pod != "" {
+		add(podTag(e.Pod)+" ", containerColor(e.Pod))
+	}
+	if l.multiCo && e.Container != "" {
+		add(e.Container+" ", containerColor(e.Container))
+	}
+	textC := pal.Text
+	if e.level == lvlError {
+		textC = lighten(pal.Err, 0.25)
+	}
+	if l.pretty && e.json {
+		if e.time != "" && l.timestamps {
+			add(e.time+" ", pal.TextDim)
+		}
+		if e.level != lvlUnknown {
+			add(fmt.Sprintf("%-5s ", levelNames[e.level]), levelColor(e.level))
+		}
+		add(e.msg, pal.TextBright)
+		add(e.fields, pal.TextDim)
+	} else {
+		if e.level >= lvlWarn {
+			textC = levelColor(e.level)
+			if e.level == lvlError {
+				textC = lighten(pal.Err, 0.25)
+			}
+		}
+		add(e.Text, textC)
+	}
+	if len(spans) == 0 {
+		add(" ", pal.Text)
+	}
+	t := richtext.Text(&l.rt, th.Shaper, spans...)
+	if l.wrap {
+		return t.Layout(gtx)
+	}
+	// single line: lay out unconstrained, clip to the visible width
+	w := gtx.Constraints.Max.X
+	g := gtx
+	g.Constraints.Max.X = 1 << 20
+	g.Constraints.Min.X = 0
+	defer clip.Rect{Max: image.Pt(w, gtx.Constraints.Max.Y)}.Push(gtx.Ops).Pop()
+	d := t.Layout(g)
+	lh := gtx.Sp(size) * 14 / 10
+	if d.Size.Y > lh {
+		d.Size.Y = lh
+	}
+	d.Size.X = w
+	return d
+}
+
+// podTag shortens a pod name to its unique suffix (rs hash + pod id).
+func podTag(pod string) string {
+	parts := strings.Split(pod, "-")
+	if len(parts) >= 3 {
+		return parts[len(parts)-1]
+	}
+	return pod
 }
 
 var containerPalette = []uint32{0x5fb3e8, 0xc792ea, 0x89ddff, 0xffcb6b, 0xc3e88d, 0xf78c6c}
@@ -331,15 +559,5 @@ func shortName(path string) string {
 }
 
 func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
+	return fmt.Sprint(n)
 }

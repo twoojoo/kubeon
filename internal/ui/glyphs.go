@@ -83,6 +83,27 @@ var (
 	icCommand    = mustIcon(icons.NavigationApps)
 	icCloudOff   = mustIcon(icons.FileCloudOff)
 	icStatusDone = mustIcon(icons.FileCloudDone)
+	icEye        = mustIcon(icons.ActionVisibility)
+	icEyeOff     = mustIcon(icons.ActionVisibilityOff)
+	icCopyText   = mustIcon(icons.ContentContentCopy)
+	icDownload   = mustIcon(icons.FileFileDownload)
+	icBell       = mustIcon(icons.SocialNotifications)
+	icBellOff    = mustIcon(icons.SocialNotificationsOff)
+	icBellActive = mustIcon(icons.SocialNotificationsActive)
+	icCordon     = mustIcon(icons.ContentBlock)
+	icUncordon   = mustIcon(icons.AVPlayCircleOutline)
+	icDrain      = mustIcon(icons.ActionEject)
+	icHelm       = mustIcon(icons.ContentUnarchive)
+	icHistory    = mustIcon(icons.ActionHistory)
+	icRollback   = mustIcon(icons.ContentUndo)
+	icXRay       = mustIcon(icons.HardwareDeviceHub)
+	icTree       = mustIcon(icons.ActionTOC)
+	icBack       = mustIcon(icons.NavigationArrowBack)
+	icValues     = mustIcon(icons.ImageTune)
+	icContainer  = mustIcon(icons.DeviceWidgets)
+	icBug        = mustIcon(icons.ActionBugReport)
+	icOK         = mustIcon(icons.ActionCheckCircle)
+	icFilter     = mustIcon(icons.ContentFilterList)
 )
 
 var icExpandLess = mustIcon(icons.NavigationExpandLess)
@@ -120,6 +141,26 @@ var gvrIcons = map[string]*widget.Icon{
 	"rbac.authorization.k8s.io/v1/clusterroles":         icRole,
 	"rbac.authorization.k8s.io/v1/clusterrolebindings":  icBinding,
 	"apiextensions.k8s.io/v1/customresourcedefinitions": icCRD,
+	"helm":         icHelm,
+	"helm-history": icHistory,
+	"containers":   icTerminal,
+}
+
+// kindIcons maps xray node kinds (resource plurals) to icons.
+var kindIcons = map[string]*widget.Icon{
+	"deployments":            icDeploy,
+	"replicasets":            icReplica,
+	"statefulsets":           icStateful,
+	"daemonsets":             icDaemon,
+	"pods":                   icPod,
+	"containers":             icTerminal,
+	"services":               icService,
+	"configmaps":             icConfigMap,
+	"secrets":                icSecret,
+	"serviceaccounts":        icSA,
+	"persistentvolumeclaims": icPVC,
+	"namespaces":             icNamespace,
+	"nodes":                  icNode,
 }
 
 var sectionIcons = map[string]*widget.Icon{
@@ -129,6 +170,7 @@ var sectionIcons = map[string]*widget.Icon{
 	"Network":          icNetwork,
 	"Storage":          icStorage,
 	"Access Control":   icAccess,
+	"Helm":             icHelm,
 	"Custom Resources": icCRD,
 }
 

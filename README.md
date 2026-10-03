@@ -16,8 +16,14 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | Details | Describe + YAML drawer, in-place edit & apply |
 | Dock | Log streaming (multi-container, follow, search, wrap, timestamps), pod shell (exec + VT emulator) |
 | Actions | Delete (with force), scale, rollout restart, port-forward (`pf` lists/stops) |
+| Nodes | Cordon / uncordon, drain (ignore DaemonSets, delete emptyDir, force) |
+| Logs+ | Multi-pod streams for deployments/sts/ds/jobs/services with per-pod tags, JSON pretty-print (level/msg/fields), level filter, download to `~/Downloads` |
+| Secrets | Decoded data tab, per-key reveal/copy, copy all as `.env`, download `.env` (mode 600) |
+| Helm | Releases, history (enter), values (user/computed), rollback, uninstall |
+| XRay | k9s dependency tree for deploy/sts/ds/rs/svc/pods as collapsible tree or pannable graph |
+| Notifications | Health watcher (CrashLoop/ImagePull/OOM, node NotReady, deployment degraded/rollout complete) → desktop notifications via D-Bus + in-app bell |
 | Overview | Nodes, pods by status, deployments health, CPU/memory requests (+usage with metrics-server), warning events |
-| Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces, `esc` |
+| Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |
 
 ## Build & run
 

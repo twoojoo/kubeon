@@ -73,3 +73,26 @@ spec:
         openAPIV3Schema:
           type: object
           x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: v1
+kind: Secret
+metadata: {name: db-creds, namespace: demo}
+type: Opaque
+stringData:
+  username: admin
+  password: s3cr3t!
+  config.json: '{"host":"db","port":5432}'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: jsonlog, namespace: demo}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: jsonlog}}
+  template:
+    metadata: {labels: {app: jsonlog}}
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c", "i=0; while true; do lvl=info; [ $((i%5)) -eq 0 ] && lvl=error; [ $((i%3)) -eq 0 ] && lvl=warn; echo \"{\\\"level\\\":\\\"$lvl\\\",\\\"msg\\\":\\\"request handled\\\",\\\"i\\\":$i,\\\"path\\\":\\\"/api/items\\\",\\\"latency_ms\\\":$((i%97))}\"; i=$((i+1)); sleep 1; done"]

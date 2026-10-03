@@ -85,6 +85,7 @@ type TableWatch struct {
 	cluster *Cluster
 	gvr     *client.GVR
 	ns      string
+	path    string
 	mt      *model.Table
 	cancel  context.CancelFunc
 	onSnap  func(*Snapshot)
@@ -106,6 +107,12 @@ type TableWatch struct {
 // Watch starts watching gvr in ns ("" = all namespaces). onSnap is called
 // from a background goroutine, at most every 200ms.
 func (c *Cluster) Watch(gvr, ns string, onSnap func(*Snapshot)) *TableWatch {
+	return c.WatchPath(gvr, ns, "", onSnap)
+}
+
+// WatchPath watches a sub-listing scoped to an owner path (e.g. helm
+// history of "ns/release").
+func (c *Cluster) WatchPath(gvr, ns, path string, onSnap func(*Snapshot)) *TableWatch {
 	g := client.NewGVR(gvr)
 	if !IsNamespaced(gvr) {
 		ns = client.ClusterScope
@@ -124,6 +131,7 @@ func (c *Cluster) Watch(gvr, ns string, onSnap func(*Snapshot)) *TableWatch {
 		cluster: c,
 		gvr:     g,
 		ns:      ns,
+		path:    path,
 		mt:      model.NewTable(g),
 		onSnap:  onSnap,
 		colorer: colorer,
@@ -140,7 +148,7 @@ func (c *Cluster) Watch(gvr, ns string, onSnap func(*Snapshot)) *TableWatch {
 	go tw.publisher(ctx)
 	tw.publish(&Snapshot{GVR: gvr, Namespace: ns, Loading: true})
 	go func() {
-		wctx := c.baseContext(ctx, g, ns, "")
+		wctx := c.baseContext(ctx, g, ns, path)
 		if err := tw.mt.Watch(wctx); err != nil {
 			tw.TableLoadFailed(err)
 		}
@@ -205,7 +213,7 @@ func (t *TableWatch) SetWide(w bool) {
 func (t *TableWatch) Refresh() {
 	ctx, cancel := timeoutCtx()
 	defer cancel()
-	_ = t.mt.Refresh(t.cluster.baseContext(ctx, t.gvr, t.ns, ""))
+	_ = t.mt.Refresh(t.cluster.baseContext(ctx, t.gvr, t.ns, t.path))
 }
 
 // TableNoData implements model.TableListener.
