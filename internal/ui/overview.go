@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gioui.org/layout"
+	"gioui.org/op/clip"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -76,13 +77,27 @@ func (o *OverviewView) Layout(gtx C) D {
 	}
 	sections := []layout.Widget{
 		func(gtx C) D {
-			return lbl(gtx, th, fontSans, 20, pal.TextBright, "Cluster overview  ·  namespace: "+nsLabel(o.ns))
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
+					return rbg(gtx, withAlpha(pal.Accent, 0x30), 7, func(gtx C) D {
+						return inset(6).Layout(gtx, func(gtx C) D { return mdi(gtx, icDashboard, pal.Accent, 20) })
+					})
+				}),
+				layout.Rigid(layout.Spacer{Width: 10}.Layout),
+				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 20, pal.TextBright, "Cluster overview") }),
+				layout.Rigid(layout.Spacer{Width: 10}.Layout),
+				layout.Rigid(func(gtx C) D { return badge(gtx, th, "namespace: "+nsLabel(o.ns), pal.Text, pal.Panel) }),
+			)
 		},
 		func(gtx C) D { return o.cards(gtx, d) },
 		func(gtx C) D { return o.capacity(gtx, d) },
 		func(gtx C) D { return o.phases(gtx, d) },
 		func(gtx C) D {
-			return lbl(gtx, th, fontSans, 15, pal.TextBright, fmt.Sprintf("Warnings (%d)", len(d.Warnings)))
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D { return iconText(gtx, th, icWarning, 15, pal.TextBright, "Warnings") }),
+				layout.Rigid(layout.Spacer{Width: 8}.Layout),
+				layout.Rigid(func(gtx C) D { return badge(gtx, th, itoa(len(d.Warnings)), pal.Warn, withAlpha(pal.Warn, 0x30)) }),
+			)
 		},
 	}
 	n := len(sections) + len(d.Warnings)
@@ -96,15 +111,24 @@ func (o *OverviewView) Layout(gtx C) D {
 	})
 }
 
-func card(gtx C, th *material.Theme, title, value, sub string, accent colorNRGBA) D {
-	return bg(gtx, pal.Panel, func(gtx C) D {
+func card(gtx C, th *material.Theme, ic *widget.Icon, title, value, sub string, accent colorNRGBA) D {
+	return rbg(gtx, pal.Panel, 10, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return inset(14).Layout(gtx, func(gtx C) D {
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, pal.TextDim, title) }),
-				layout.Rigid(layout.Spacer{Height: 6}.Layout),
-				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 26, accent, value) }),
-				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, pal.TextDim, sub) }),
+		return inset(16).Layout(gtx, func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Flexed(1, func(gtx C) D {
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, pal.TextDim, title) }),
+						layout.Rigid(layout.Spacer{Height: 6}.Layout),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 28, pal.TextBright, value) }),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, accent, sub) }),
+					)
+				}),
+				layout.Rigid(func(gtx C) D {
+					return rbg(gtx, withAlpha(accent, 0x28), 22, func(gtx C) D {
+						return inset(11).Layout(gtx, func(gtx C) D { return mdi(gtx, ic, accent, 22) })
+					})
+				}),
 			)
 		})
 	})
@@ -127,16 +151,16 @@ func (o *OverviewView) cards(gtx C, d *backend.Overview) D {
 	}
 	items := []layout.Widget{
 		func(gtx C) D {
-			return card(gtx, th, "NODES", fmt.Sprintf("%d / %d", d.NodesReady, d.Nodes), "ready", nodeC)
+			return card(gtx, th, icNode, "NODES", fmt.Sprintf("%d / %d", d.NodesReady, d.Nodes), "ready", nodeC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, "PODS", itoa(d.Pods), fmt.Sprintf("%d failing", bad), podC)
+			return card(gtx, th, icPod, "PODS", itoa(d.Pods), fmt.Sprintf("%d failing", bad), podC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, "DEPLOYMENTS", itoa(d.Deployments), fmt.Sprintf("%d unavailable", d.DeploymentsBad), depC)
+			return card(gtx, th, icDeploy, "DEPLOYMENTS", itoa(d.Deployments), fmt.Sprintf("%d unavailable", d.DeploymentsBad), depC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, "NAMESPACES", itoa(d.Namespaces), "", pal.Info)
+			return card(gtx, th, icNamespace, "NAMESPACES", itoa(d.Namespaces), "total", pal.Info)
 		},
 	}
 	var ch []layout.FlexChild
@@ -155,20 +179,20 @@ func (o *OverviewView) capacity(gtx C, d *backend.Overview) D {
 	mem := func(b int64) string { return fmt.Sprintf("%.1fGi", float64(b)/(1<<30)) }
 	return layout.Flex{}.Layout(gtx,
 		layout.Flexed(1, func(gtx C) D {
-			return meter(gtx, th, "CPU (cores)", d.CPURequests, d.CPUUsage, d.CPUCapacity, cpu)
+			return meter(gtx, th, icCPU, "CPU (cores)", d.CPURequests, d.CPUUsage, d.CPUCapacity, cpu)
 		}),
 		layout.Rigid(layout.Spacer{Width: 12}.Layout),
 		layout.Flexed(1, func(gtx C) D {
-			return meter(gtx, th, "Memory", d.MemRequests, d.MemUsage, d.MemCapacity, mem)
+			return meter(gtx, th, icMem, "Memory", d.MemRequests, d.MemUsage, d.MemCapacity, mem)
 		}),
 	)
 }
 
 // meter shows requests (and usage when metrics-server is present) vs allocatable.
-func meter(gtx C, th *material.Theme, title string, req, usage, capacity int64, f func(int64) string) D {
-	return bg(gtx, pal.Panel, func(gtx C) D {
+func meter(gtx C, th *material.Theme, ic *widget.Icon, title string, req, usage, capacity int64, f func(int64) string) D {
+	return rbg(gtx, pal.Panel, 10, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return inset(14).Layout(gtx, func(gtx C) D {
+		return inset(16).Layout(gtx, func(gtx C) D {
 			bar := func(gtx C, v int64, c colorNRGBA, label string) D {
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 					layout.Rigid(func(gtx C) D {
@@ -177,10 +201,10 @@ func meter(gtx C, th *material.Theme, title string, req, usage, capacity int64, 
 					layout.Rigid(layout.Spacer{Height: 4}.Layout),
 					layout.Rigid(func(gtx C) D {
 						w, h := gtx.Constraints.Max.X, gtx.Dp(8)
-						fillRect(gtx, pal.Bg, image.Rect(0, 0, w, h))
-						if capacity > 0 {
-							fw := int(float64(w) * min(1, float64(v)/float64(capacity)))
-							fillRect(gtx, c, image.Rect(0, 0, fw, h))
+						fillRRect(gtx, pal.Bg, image.Rect(0, 0, w, h), h/2)
+						if capacity > 0 && v > 0 {
+							fw := max(h, int(float64(w)*min(1, float64(v)/float64(capacity))))
+							fillRRect(gtx, c, image.Rect(0, 0, fw, h), h/2)
 						}
 						return D{Size: image.Pt(w, h)}
 					}),
@@ -194,7 +218,13 @@ func meter(gtx C, th *material.Theme, title string, req, usage, capacity int64, 
 			}
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx C) D {
-					return lbl(gtx, th, fontSans, 12, pal.TextDim, title+"  ·  allocatable "+f(capacity))
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx C) D { return mdi(gtx, ic, pal.Accent, 18) }),
+						layout.Rigid(layout.Spacer{Width: 8}.Layout),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, pal.TextBright, title) }),
+						layout.Flexed(1, layout.Spacer{}.Layout),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, pal.TextDim, "allocatable "+f(capacity)) }),
+					)
 				}),
 				layout.Rigid(layout.Spacer{Height: 10}.Layout),
 				layout.Rigid(func(gtx C) D {
@@ -224,14 +254,17 @@ func (o *OverviewView) phases(gtx C, d *backend.Overview) D {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	return bg(gtx, pal.Panel, func(gtx C) D {
+	return rbg(gtx, pal.Panel, 10, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return inset(14).Layout(gtx, func(gtx C) D {
+		return inset(16).Layout(gtx, func(gtx C) D {
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, pal.TextDim, "POD STATUS") }),
+				layout.Rigid(func(gtx C) D { return iconText(gtx, th, icPod, 14, pal.TextBright, "Pod status") }),
 				layout.Rigid(layout.Spacer{Height: 10}.Layout),
 				layout.Rigid(func(gtx C) D {
-					w, h := gtx.Constraints.Max.X, gtx.Dp(14)
+					w, h := gtx.Constraints.Max.X, gtx.Dp(12)
+					cl := clip.UniformRRect(image.Rect(0, 0, w, h), h/2).Push(gtx.Ops)
+					defer cl.Pop()
+					fillRect(gtx, pal.Bg, image.Rect(0, 0, w, h))
 					x := 0
 					for _, k := range keys {
 						if d.Pods == 0 {
@@ -252,9 +285,7 @@ func (o *OverviewView) phases(gtx C, d *backend.Overview) D {
 							return layout.Inset{Right: unit.Dp(18)}.Layout(gtx, func(gtx C) D {
 								return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 									layout.Rigid(func(gtx C) D {
-										s := gtx.Dp(10)
-										fillRect(gtx, rgb(phaseColors[k]), image.Rect(0, 0, s, s))
-										return D{Size: image.Pt(s, s)}
+										return dot(gtx, rgb(phaseColors[k]), 9)
 									}),
 									layout.Rigid(layout.Spacer{Width: 6}.Layout),
 									layout.Rigid(func(gtx C) D {
@@ -273,13 +304,15 @@ func (o *OverviewView) phases(gtx C, d *backend.Overview) D {
 
 func (o *OverviewView) warning(gtx C, w *backend.EventInfo) D {
 	th := o.app.th
-	return layout.Inset{Bottom: 1}.Layout(gtx, func(gtx C) D {
-		return bg(gtx, pal.Panel, func(gtx C) D {
+	return layout.Inset{Bottom: 6}.Layout(gtx, func(gtx C) D {
+		return rbg(gtx, pal.Panel, 8, func(gtx C) D {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return insetHV(12, 8).Layout(gtx, func(gtx C) D {
+			return insetHV(14, 10).Layout(gtx, func(gtx C) D {
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 					layout.Rigid(func(gtx C) D {
-						return layout.Flex{}.Layout(gtx,
+						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return mdi(gtx, icWarning, pal.Warn, 15) }),
+							layout.Rigid(layout.Spacer{Width: 8}.Layout),
 							layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, pal.Warn, w.Reason) }),
 							layout.Rigid(layout.Spacer{Width: 10}.Layout),
 							layout.Flexed(1, func(gtx C) D {

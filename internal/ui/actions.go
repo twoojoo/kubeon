@@ -77,9 +77,11 @@ func (v *ResourceView) shell() {
 				a.dock.openShell(path, cc[0])
 				return
 			}
-			a.overlay = newPicker(a, "Shell into container", cc, false, func(co string) {
+			p := newPicker(a, "Shell into container", cc, false, func(co string) {
 				a.dock.openShell(path, co)
 			})
+			p.icon = icTerminal
+			a.overlay = p
 		})
 	}()
 }
@@ -143,18 +145,22 @@ func (a *App) pickNamespace() {
 	}
 	a.refreshNamespaces()
 	items := append([]string{"All namespaces"}, a.namespaces...)
-	a.overlay = newPicker(a, "Namespace", items, false, func(s string) {
+	p := newPicker(a, "Namespace", items, false, func(s string) {
 		if s == "All namespaces" {
 			s = ""
 		}
 		a.setNamespace(s)
 	})
+	p.icon = icNamespace
+	a.overlay = p
 }
 
 func (a *App) pickContext() {
-	a.overlay = newPicker(a, "Switch context", a.contexts, false, func(s string) {
+	p := newPicker(a, "Switch context", a.contexts, false, func(s string) {
 		a.connect(s)
 	})
+	p.icon = icCluster
+	a.overlay = p
 }
 
 // openPalette opens the k9s-like command prompt: resource aliases

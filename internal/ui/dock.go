@@ -15,6 +15,7 @@ import (
 // dockTab is a session shown in the bottom dock (logs, shell).
 type dockTab interface {
 	Title() string
+	Icon() *widget.Icon
 	Layout(gtx C) D
 	Close()
 	Focused(gtx C) bool
@@ -174,8 +175,20 @@ func (d *Dock) layoutBar(gtx C, barH int) D {
 					active := i == d.active
 					m := op.Record(gtx.Ops)
 					dims := layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-						layout.Rigid(func(gtx C) D { return flatButton(gtx, th, &d.tabBtn[i], t.Title(), active) }),
-						layout.Rigid(func(gtx C) D { return iconButton(gtx, &d.closeBt[i], iconClose) }),
+						layout.Rigid(func(gtx C) D {
+							return d.tabBtn[i].Layout(gtx, func(gtx C) D {
+								c := pal.TextDim
+								if active || d.tabBtn[i].Hovered() {
+									c = pal.TextBright
+								}
+								return layout.Inset{Left: 12, Right: 4, Top: 6, Bottom: 6}.Layout(gtx, func(gtx C) D {
+									return iconText(gtx, th, t.Icon(), 12, c, t.Title())
+								})
+							})
+						}),
+						layout.Rigid(func(gtx C) D {
+							return layout.Inset{Right: 6}.Layout(gtx, func(gtx C) D { return iconOnly(gtx, &d.closeBt[i], icClose, 12) })
+						}),
 					)
 					call := m.Stop()
 					if active {
@@ -189,11 +202,11 @@ func (d *Dock) layoutBar(gtx C, barH int) D {
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx, items...)
 		}),
 		layout.Rigid(func(gtx C) D {
-			k := iconChevronDown
+			ic := icExpand
 			if d.hidden {
-				k = iconChevronUp
+				ic = icExpandLess
 			}
-			return iconButton(gtx, &d.minBtn, k)
+			return iconOnly(gtx, &d.minBtn, ic, 16)
 		}),
 		layout.Rigid(layout.Spacer{Width: unit.Dp(6)}.Layout),
 	)

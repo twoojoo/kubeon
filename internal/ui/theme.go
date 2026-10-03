@@ -134,12 +134,14 @@ func colorMat(gtx C, c color.NRGBA) op.CallOp {
 
 // lbl draws a single-line truncated label.
 func lbl(gtx C, th *material.Theme, f font.Font, size unit.Sp, c color.NRGBA, s string) D {
-	l := widget.Label{MaxLines: 1, Truncator: "…"}
+	gtx.Constraints.Min.Y = 0 // let W/E directions center the line vertically
+	l := widget.Label{MaxLines: 1, Truncator: "…", LineHeightScale: 1.05}
 	return l.Layout(gtx, th.Shaper, f, size, s, colorMat(gtx, c))
 }
 
 func lblAlign(gtx C, th *material.Theme, f font.Font, size unit.Sp, c color.NRGBA, s string, a text.Alignment) D {
-	l := widget.Label{MaxLines: 1, Truncator: "…", Alignment: a}
+	gtx.Constraints.Min.Y = 0
+	l := widget.Label{MaxLines: 1, Truncator: "…", Alignment: a, LineHeightScale: 1.05}
 	return l.Layout(gtx, th.Shaper, f, size, s, colorMat(gtx, c))
 }
 
@@ -156,8 +158,8 @@ func button(gtx C, th *material.Theme, cl *widget.Clickable, txt string, c color
 		if cl.Hovered() {
 			bgc = lighten(c, 0.12)
 		}
-		return bg(gtx, bgc, func(gtx C) D {
-			return insetHV(10, 5).Layout(gtx, func(gtx C) D {
+		return rbg(gtx, bgc, 6, func(gtx C) D {
+			return insetHV(12, 6).Layout(gtx, func(gtx C) D {
 				return lbl(gtx, th, fontSans, 13, pal.TextBright, txt)
 			})
 		})

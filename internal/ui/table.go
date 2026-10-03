@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"image"
 	"strings"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
-	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -23,8 +21,8 @@ import (
 )
 
 const (
-	rowHeight    = unit.Dp(26)
-	headerHeight = unit.Dp(30)
+	rowHeight    = unit.Dp(30)
+	headerHeight = unit.Dp(32)
 	cellPad      = unit.Dp(10)
 	tableText    = unit.Sp(13)
 )
@@ -49,6 +47,7 @@ type ResourceView struct {
 	}
 	headerClicks []widget.Clickable
 	rowsTag      int
+	hover        int
 	lastClick    time.Time
 	lastClickRow int
 
@@ -56,11 +55,11 @@ type ResourceView struct {
 	lastFilter string
 	wide       bool
 
-	pfBtn, nsBtn, logsBtn, shellBtn, yamlBtn, descBtn, delBtn, scaleBtn, restartBtn widget.Clickable
+	clearBtn, pfBtn, nsBtn, logsBtn, shellBtn, yamlBtn, descBtn, delBtn, scaleBtn, restartBtn widget.Clickable
 }
 
 func newResourceView(a *App) *ResourceView {
-	v := ResourceView{app: a, sel: -1}
+	v := ResourceView{app: a, sel: -1, hover: -1}
 	v.list.Axis = layout.Vertical
 	v.filter.SingleLine = true
 	v.filter.Submit = true
@@ -239,103 +238,156 @@ func (v *ResourceView) handleToolbar(gtx C) {
 
 func (v *ResourceView) layoutToolbar(gtx C) D {
 	th := v.app.th
-	roomy := gtx.Constraints.Max.X > gtx.Dp(1050)
 	return bg(gtx, pal.Panel, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
-		return insetHV(14, 8).Layout(gtx, func(gtx C) D {
-			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-				layout.Rigid(func(gtx C) D {
-					return lbl(gtx, th, fontSans, 17, pal.TextBright, v.title)
-				}),
-				layout.Rigid(layout.Spacer{Width: 10}.Layout),
-				layout.Rigid(func(gtx C) D {
-					s := v.snap
-					if s == nil || s.Loading {
-						return lbl(gtx, th, fontSans, 12, pal.TextDim, "loading…")
-					}
-					n := fmt.Sprintf("%d items", len(s.Rows))
-					if len(s.Rows) != s.Total {
-						n = fmt.Sprintf("%d / %d items", len(s.Rows), s.Total)
-					}
-					return lbl(gtx, th, fontSans, 12, pal.TextDim, n)
-				}),
-				layout.Flexed(1, layout.Spacer{}.Layout),
-				layout.Rigid(func(gtx C) D {
-					if !roomy {
-						return D{}
-					}
-					return v.layoutActions(gtx)
-				}),
-				layout.Rigid(layout.Spacer{Width: 12}.Layout),
-				layout.Rigid(func(gtx C) D {
-					if !backend.IsNamespaced(v.gvr) {
-						return D{}
-					}
-					label := "Namespace: " + nsLabel(v.ns)
-					return bg(gtx, pal.Bg, func(gtx C) D {
-						return v.nsBtn.Layout(gtx, func(gtx C) D {
-							return insetHV(8, 4).Layout(gtx, func(gtx C) D {
-								return labelIcon(gtx, th, 13, pal.TextBright, label, iconChevronDown)
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx C) D {
+				return layout.Inset{Left: 16, Right: 14, Top: 10, Bottom: 8}.Layout(gtx, func(gtx C) D {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx C) D {
+							return rbg(gtx, withAlpha(pal.Accent, 0x30), 7, func(gtx C) D {
+								return inset(6).Layout(gtx, func(gtx C) D { return mdi(gtx, iconFor(v.gvr), pal.Accent, 20) })
 							})
-						})
-					})
-				}),
-				layout.Rigid(layout.Spacer{Width: 8}.Layout),
-				layout.Rigid(func(gtx C) D {
-					gtx.Constraints.Min.X = gtx.Dp(240)
-					gtx.Constraints.Max.X = gtx.Dp(240)
-					return v.layoutFilter(gtx)
-				}),
-			)
-		})
+						}),
+						layout.Rigid(layout.Spacer{Width: 10}.Layout),
+						layout.Rigid(func(gtx C) D {
+							return lbl(gtx, th, fontSans, 18, pal.TextBright, v.title)
+						}),
+						layout.Rigid(layout.Spacer{Width: 10}.Layout),
+						layout.Rigid(func(gtx C) D {
+							s := v.snap
+							if s == nil || s.Loading {
+								return badge(gtx, th, "loading…", pal.TextDim, pal.Bg)
+							}
+							n := itoa(len(s.Rows))
+							if len(s.Rows) != s.Total {
+								n += " / " + itoa(s.Total)
+							}
+							return badge(gtx, th, n, pal.Text, pal.Bg)
+						}),
+						layout.Flexed(1, layout.Spacer{}.Layout),
+						layout.Rigid(func(gtx C) D {
+							if !backend.IsNamespaced(v.gvr) {
+								return D{}
+							}
+							return v.nsBtn.Layout(gtx, func(gtx C) D {
+								b := pal.Border
+								if v.nsBtn.Hovered() {
+									b = pal.TextDim
+								}
+								return rborder(gtx, b, pal.Bg, 6, func(gtx C) D {
+									return insetHV(10, 6).Layout(gtx, func(gtx C) D {
+										return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+											layout.Rigid(func(gtx C) D { return mdi(gtx, icNamespace, pal.TextDim, 15) }),
+											layout.Rigid(layout.Spacer{Width: 7}.Layout),
+											layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, pal.TextBright, nsLabel(v.ns)) }),
+											layout.Rigid(layout.Spacer{Width: 4}.Layout),
+											layout.Rigid(func(gtx C) D { return mdi(gtx, icExpand, pal.TextDim, 16) }),
+										)
+									})
+								})
+							})
+						}),
+						layout.Rigid(layout.Spacer{Width: 8}.Layout),
+						layout.Rigid(func(gtx C) D {
+							w := min(gtx.Dp(300), gtx.Constraints.Max.X)
+							gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
+							return v.layoutFilter(gtx)
+						}),
+					)
+				})
+			}),
+			layout.Rigid(v.layoutActions),
+		)
 	})
 }
 
+// layoutActions is the contextual action bar for the selected object.
 func (v *ResourceView) layoutActions(gtx C) D {
 	row, ok := v.selected()
 	if !ok {
 		return D{}
 	}
-	_ = row
 	th := v.app.th
 	c := v.app.cluster
-	var items []layout.FlexChild
-	add := func(cl *widget.Clickable, txt string, show bool) {
+	items := []layout.FlexChild{
+		layout.Rigid(func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D { return dot(gtx, stateColor(row.State), 8) }),
+				layout.Rigid(layout.Spacer{Width: 8}.Layout),
+				layout.Rigid(func(gtx C) D {
+					gtx.Constraints.Max.X = min(gtx.Constraints.Max.X, gtx.Dp(360))
+					return lbl(gtx, th, fontSans, 13, pal.TextBright, row.ID)
+				}),
+			)
+		}),
+		layout.Flexed(1, layout.Spacer{}.Layout),
+	}
+	compact := gtx.Constraints.Max.X < gtx.Dp(900)
+	add := func(cl *widget.Clickable, ic *widget.Icon, txt string, show bool, danger bool) {
 		if !show {
 			return
 		}
-		items = append(items, layout.Rigid(func(gtx C) D { return flatButton(gtx, th, cl, txt, false) }))
+		if compact {
+			txt = ""
+		}
+		fg := pal.Text
+		if danger {
+			fg = pal.Err
+		}
+		items = append(items, layout.Rigid(func(gtx C) D {
+			return layout.Inset{Left: 4}.Layout(gtx, func(gtx C) D {
+				return pillButton(gtx, th, cl, ic, txt, fg, colorNRGBA{})
+			})
+		}))
 	}
 	isPod := v.gvr == "v1/pods"
-	add(&v.logsBtn, "Logs", c.IsLoggable(v.gvr))
-	add(&v.shellBtn, "Shell", isPod)
-	add(&v.pfBtn, "Forward", canForward(v.gvr))
-	add(&v.descBtn, "Describe", true)
-	add(&v.yamlBtn, "YAML", true)
-	add(&v.scaleBtn, "Scale", c.CanScale(v.gvr))
-	add(&v.restartBtn, "Restart", c.CanRestart(v.gvr))
-	add(&v.delBtn, "Delete", backend.CanVerb(v.gvr, "delete"))
-	return layout.Flex{Alignment: layout.Middle}.Layout(gtx, items...)
+	add(&v.logsBtn, icLogs, "Logs", c.IsLoggable(v.gvr), false)
+	add(&v.shellBtn, icTerminal, "Shell", isPod, false)
+	add(&v.pfBtn, icForward, "Forward", canForward(v.gvr), false)
+	add(&v.descBtn, icDescribe, "Describe", true, false)
+	add(&v.yamlBtn, icEdit, "YAML", true, false)
+	add(&v.scaleBtn, icScale, "Scale", c.CanScale(v.gvr), false)
+	add(&v.restartBtn, icRestart, "Restart", c.CanRestart(v.gvr), false)
+	add(&v.delBtn, icDelete, "Delete", backend.CanVerb(v.gvr, "delete"), true)
+	return bg(gtx, pal.Header, func(gtx C) D {
+		gtx.Constraints.Min.X = gtx.Constraints.Max.X
+		return layout.Inset{Left: 16, Right: 10, Top: 4, Bottom: 4}.Layout(gtx, func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx, items...)
+		})
+	})
 }
 
 func (v *ResourceView) layoutFilter(gtx C) D {
 	th := v.app.th
+	if v.clearBtn.Clicked(gtx) {
+		v.filter.SetText("")
+		v.applyFilter()
+	}
 	border := pal.Border
 	if gtx.Focused(&v.filter) {
 		border = pal.Accent
 	}
-	return bg(gtx, border, func(gtx C) D {
-		return inset(1).Layout(gtx, func(gtx C) D {
-			return bg(gtx, pal.Bg, func(gtx C) D {
-				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				return insetHV(8, 5).Layout(gtx, func(gtx C) D {
-					e := material.Editor(th, &v.filter, "Filter (regex, -f fuzzy, -l sel)")
+	return rborder(gtx, border, pal.Bg, 6, func(gtx C) D {
+		gtx.Constraints.Min.X = gtx.Constraints.Max.X
+		return insetHV(9, 6).Layout(gtx, func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D { return mdi(gtx, icSearch, pal.TextDim, 16) }),
+				layout.Rigid(layout.Spacer{Width: 7}.Layout),
+				layout.Flexed(1, func(gtx C) D {
+					e := material.Editor(th, &v.filter, "Filter  (regex · -f fuzzy · -l label=…)")
 					e.TextSize = 13
 					e.Color = pal.TextBright
 					e.HintColor = pal.TextDim
 					return e.Layout(gtx)
-				})
-			})
+				}),
+				layout.Rigid(func(gtx C) D {
+					if v.filter.Len() == 0 {
+						return D{}
+					}
+					return iconOnly(gtx, &v.clearBtn, icClose, 12)
+				}),
+			)
 		})
 	})
 }
@@ -371,8 +423,8 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 		return
 	}
 	v.widthOf.seq, v.widthOf.avail = s.Seq, avail
-	charW := float32(gtx.Sp(tableText)) * 0.6
-	pad := gtx.Dp(cellPad) * 2
+	charW := float32(gtx.Sp(tableText)) * 0.64
+	pad := gtx.Dp(cellPad)*2 + gtx.Dp(4)
 	maxLen := make([]int, len(s.Columns))
 	for i, c := range s.Columns {
 		maxLen[i] = utf8.RuneCountInString(c.Name) + 2
@@ -395,6 +447,9 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 	minW, maxW := gtx.Dp(40), gtx.Dp(460)
 	for i, n := range maxLen {
 		w[i] = max(minW, min(maxW, int(float32(n)*charW)+pad))
+		if isStatusCol(s.Columns[i].Name) {
+			w[i] += gtx.Dp(28) // pill padding + dot
+		}
 		total += w[i]
 	}
 	if total > avail && total > 0 {
@@ -411,12 +466,18 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 			w[nameIdx] = min(w[nameIdx], avail*2/5)
 			rest -= w[nameIdx]
 		}
+		fixed := func(i int) bool { return i == nameIdx || isStatusCol(s.Columns[i].Name) }
+		for i := range w {
+			if i != nameIdx && fixed(i) {
+				rest -= w[i]
+			}
+		}
 		lo, hi := minW, maxW
 		for lo < hi {
 			mid := (lo + hi + 1) / 2
 			sum := 0
 			for i, x := range w {
-				if i != nameIdx {
+				if !fixed(i) {
 					sum += min(x, mid)
 				}
 			}
@@ -428,7 +489,7 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 		}
 		used := 0
 		for i := range w {
-			if i != nameIdx {
+			if !fixed(i) {
 				w[i] = min(w[i], lo)
 			}
 			used += w[i]
@@ -485,13 +546,17 @@ func (v *ResourceView) layoutHeader(gtx C, s *backend.Snapshot) D {
 				gtx.Constraints.Min.X = gtx.Constraints.Max.X
 				return layout.W.Layout(gtx, func(gtx C) D {
 					if sorted {
-						k := iconChevronUp
+						ic := icUp
 						if !s.SortAsc {
-							k = iconChevronDown
+							ic = icDown
 						}
-						return labelIcon(gtx, th, 12, col, name, k)
+						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, col, name) }),
+							layout.Rigid(layout.Spacer{Width: 4}.Layout),
+							layout.Rigid(func(gtx C) D { return mdi(gtx, ic, pal.Accent, 12) }),
+						)
 					}
-					return lbl(gtx, th, fontSans, 12, col, name)
+					return lbl(gtx, th, fontSans, 11, col, name)
 				})
 			})
 		})
@@ -514,12 +579,20 @@ func (v *ResourceView) layoutRows(gtx C, s *backend.Snapshot) D {
 	area := clip.Rect{Max: size}.Push(gtx.Ops)
 	event.Op(gtx.Ops, &v.rowsTag)
 	for {
-		ev, ok := gtx.Event(pointer.Filter{Target: &v.rowsTag, Kinds: pointer.Press})
+		ev, ok := gtx.Event(pointer.Filter{Target: &v.rowsTag, Kinds: pointer.Press | pointer.Move | pointer.Leave | pointer.Cancel})
 		if !ok {
 			break
 		}
 		pe, ok := ev.(pointer.Event)
-		if !ok || pe.Kind != pointer.Press {
+		if !ok {
+			continue
+		}
+		switch pe.Kind {
+		case pointer.Move:
+			v.hover = v.rowAt(pe.Position, rh)
+			continue
+		case pointer.Leave, pointer.Cancel:
+			v.hover = -1
 			continue
 		}
 		gtx.Execute(key.FocusCmd{})
@@ -538,11 +611,17 @@ func (v *ResourceView) layoutRows(gtx C, s *backend.Snapshot) D {
 	if len(s.Rows) == 0 {
 		area.Pop()
 		return layout.Center.Layout(gtx, func(gtx C) D {
-			msg := "No resources"
+			msg, ic, c := "No "+strings.ToLower(v.title)+" found", iconFor(v.gvr), pal.TextDim
 			if s.Err != nil {
-				msg = s.Err.Error()
+				msg, ic, c = s.Err.Error(), icError, pal.Err
+			} else if v.filter.Len() > 0 {
+				msg, ic = "Nothing matches the filter", icSearch
 			}
-			return lbl(gtx, th, fontSans, 14, pal.TextDim, msg)
+			return layout.Flex{Axis: layout.Vertical, Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D { return mdi(gtx, ic, withAlpha(c, 0x80), 48) }),
+				layout.Rigid(layout.Spacer{Height: 10}.Layout),
+				layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, c, msg) }),
+			)
 		})
 	}
 
@@ -562,14 +641,20 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 	th := v.app.th
 	r := s.Rows[i]
 	sz := image.Pt(gtx.Constraints.Max.X, rh)
+	sel := i == v.sel
 	switch {
-	case i == v.sel:
+	case sel:
 		fillRect(gtx, pal.Selected, image.Rectangle{Max: sz})
-	case i%2 == 1:
-		fillRect(gtx, withAlpha(pal.Panel, 0x60), image.Rectangle{Max: sz})
+		fillRect(gtx, pal.Accent, image.Rect(0, 0, gtx.Dp(3), rh))
+	case i == v.hover:
+		fillRect(gtx, pal.Hover, image.Rectangle{Max: sz})
+	}
+	fillRect(gtx, withAlpha(pal.Border, 0x70), image.Rect(0, rh-gtx.Dp(1), sz.X, rh))
+	if !sel && (r.State == backend.StateErr || r.State == backend.StatePending) {
+		fillRect(gtx, stateColor(r.State), image.Rect(0, gtx.Dp(6), gtx.Dp(3), rh-gtx.Dp(6)))
 	}
 	fg := stateColor(r.State)
-	if i == v.sel {
+	if sel {
 		fg = pal.TextBright
 	}
 	x := 0
@@ -580,23 +665,45 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 		}
 		w := v.widths[c]
 		if cell != "" {
-			st := op.Offset(image.Pt(x+pad, (rh-gtx.Sp(tableText+4))/2)).Push(gtx.Ops)
+			st := op.Offset(image.Pt(x+pad, 0)).Push(gtx.Ops)
 			cg := gtx
 			cg.Constraints = layout.Exact(image.Pt(max(0, w-2*pad), rh))
-			a := text.Start
-			if s.Columns[c].AlignRight {
-				a = text.End
-			}
 			col := fg
-			if c == 0 && i != v.sel && r.State == backend.StateStd {
+			if c == 0 && !sel && r.State == backend.StateStd {
 				col = pal.TextBright
 			}
-			lblAlign(cg, th, fontSans, tableText, col, cell, a)
+			text := func(gtx C) D { return lbl(gtx, th, fontSans, tableText, col, cell) }
+			name := s.Columns[c].Name
+			tone, toned := statusTone(cell)
+			switch {
+			case isStatusCol(name) && toned:
+				layout.W.Layout(cg, func(gtx C) D { return pill(gtx, th, cell, tone) })
+			case name == "READY" && !sel && notReady(cell) && r.State != backend.StateCompleted:
+				col = pal.Warn
+				layout.W.Layout(cg, text)
+			case s.Columns[c].AlignRight:
+				layout.E.Layout(cg, text)
+			default:
+				layout.W.Layout(cg, text)
+			}
 			st.Pop()
 		}
 		x += w
 	}
 	return D{Size: sz}
+}
+
+func isStatusCol(n string) bool {
+	switch n {
+	case "STATUS", "PHASE", "STATE", "HEALTH":
+		return true
+	}
+	return false
+}
+
+func notReady(s string) bool {
+	a, b, ok := strings.Cut(s, "/")
+	return ok && a != b
 }
 
 func titleFor(gvr string) string {

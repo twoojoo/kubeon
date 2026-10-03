@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"image"
 	"io"
 	"regexp"
 	"strings"
@@ -54,6 +55,8 @@ func (l *LogView) Title() string {
 	}
 	return t
 }
+
+func (l *LogView) Icon() *widget.Icon { return icLogs }
 
 func (l *LogView) Focused(gtx C) bool { return gtx.Focused(&l.filter) }
 
@@ -196,12 +199,22 @@ func (l *LogView) Layout(gtx C) D {
 					layout.Rigid(func(gtx C) D {
 						gtx.Constraints.Max.X = gtx.Dp(260)
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
-						return bg(gtx, pal.Panel, func(gtx C) D {
-							return insetHV(8, 4).Layout(gtx, func(gtx C) D {
-								e := material.Editor(th, &l.filter, "Search logs (regex)")
-								e.TextSize = 12
-								e.HintColor = pal.TextDim
-								return e.Layout(gtx)
+						b := pal.Border
+						if gtx.Focused(&l.filter) {
+							b = pal.Accent
+						}
+						return rborder(gtx, b, pal.Bg, 6, func(gtx C) D {
+							return insetHV(8, 5).Layout(gtx, func(gtx C) D {
+								return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+									layout.Rigid(func(gtx C) D { return mdi(gtx, icSearch, pal.TextDim, 14) }),
+									layout.Rigid(layout.Spacer{Width: 6}.Layout),
+									layout.Flexed(1, func(gtx C) D {
+										e := material.Editor(th, &l.filter, "Search logs (regex)")
+										e.TextSize = 12
+										e.HintColor = pal.TextDim
+										return e.Layout(gtx)
+									}),
+								)
 							})
 						})
 					}),
@@ -212,8 +225,8 @@ func (l *LogView) Layout(gtx C) D {
 					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.wrapBtn, "Wrap", l.wrap) }),
 					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.tsBtn, "Timestamps", l.timestamps) }),
 					layout.Rigid(func(gtx C) D { return toggle(gtx, th, &l.allBtn, "All containers", l.allContainers) }),
-					layout.Rigid(func(gtx C) D { return flatButton(gtx, th, &l.clearBtn, "Clear", false) }),
-					layout.Rigid(func(gtx C) D { return flatButton(gtx, th, &l.copyBtn, "Copy", false) }),
+					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.clearBtn, icClear, "Clear", pal.TextDim, colorNRGBA{}) }),
+					layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &l.copyBtn, icCopy, "Copy", pal.TextDim, colorNRGBA{}) }),
 					layout.Flexed(1, func(gtx C) D {
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
 						return layout.E.Layout(gtx, func(gtx C) D {
@@ -277,12 +290,37 @@ func containerColor(name string) colorNRGBA {
 	return rgb(containerPalette[h%len(containerPalette)])
 }
 
+// toggle is a small switch with a label.
 func toggle(gtx C, th *material.Theme, cl *widget.Clickable, txt string, on bool) D {
-	mark := "○ "
-	if on {
-		mark = "● "
-	}
-	return flatButton(gtx, th, cl, mark+txt, on)
+	return cl.Layout(gtx, func(gtx C) D {
+		return insetHV(7, 4).Layout(gtx, func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
+					w, h := gtx.Dp(26), gtx.Dp(14)
+					track := pal.Border
+					if on {
+						track = pal.Accent
+					}
+					fillRRect(gtx, track, image.Rect(0, 0, w, h), h/2)
+					k := h - gtx.Dp(4)
+					x := gtx.Dp(2)
+					if on {
+						x = w - k - gtx.Dp(2)
+					}
+					fillRRect(gtx, pal.TextBright, image.Rect(x, gtx.Dp(2), x+k, gtx.Dp(2)+k), k/2)
+					return D{Size: image.Pt(w, h)}
+				}),
+				layout.Rigid(layout.Spacer{Width: 6}.Layout),
+				layout.Rigid(func(gtx C) D {
+					c := pal.TextDim
+					if on || cl.Hovered() {
+						c = pal.Text
+					}
+					return lbl(gtx, th, fontSans, 12, c, txt)
+				}),
+			)
+		})
+	})
 }
 
 func shortName(path string) string {

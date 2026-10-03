@@ -160,9 +160,15 @@ func (d *Drawer) Layout(gtx C) D {
 				return insetHV(12, 8).Layout(gtx, func(gtx C) D {
 					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 						layout.Flexed(1, func(gtx C) D {
-							return lbl(gtx, th, fontSans, 14, pal.TextBright, titleFor(d.gvr)+": "+d.path)
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								layout.Rigid(func(gtx C) D { return mdi(gtx, iconFor(d.gvr), pal.Accent, 18) }),
+								layout.Rigid(layout.Spacer{Width: 8}.Layout),
+								layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, pal.TextDim, titleFor(d.gvr)) }),
+								layout.Rigid(layout.Spacer{Width: 8}.Layout),
+								layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 14, pal.TextBright, d.path) }),
+							)
 						}),
-						layout.Rigid(func(gtx C) D { return iconButton(gtx, &d.closeBtn, iconClose) }),
+						layout.Rigid(func(gtx C) D { return iconOnly(gtx, &d.closeBtn, icClose, 16) }),
 					)
 				})
 			})
@@ -178,17 +184,17 @@ func (d *Drawer) Layout(gtx C) D {
 							return D{}
 						}
 						if !d.editing {
-							return flatButton(gtx, th, &d.editBtn, "Edit", false)
+							return pillButton(gtx, th, &d.editBtn, icEdit, "Edit", pal.Text, colorNRGBA{})
 						}
 						return layout.Flex{}.Layout(gtx,
-							layout.Rigid(func(gtx C) D { return flatButton(gtx, th, &d.revertBtn, "Cancel", false) }),
+							layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &d.revertBtn, icClose, "Cancel", pal.Text, colorNRGBA{}) }),
 							layout.Rigid(layout.Spacer{Width: 6}.Layout),
 							layout.Rigid(func(gtx C) D {
 								c := pal.Accent
 								if !d.dirty {
 									c = pal.Border
 								}
-								return button(gtx, th, &d.saveBtn, "Save & Apply", c)
+								return pillButton(gtx, th, &d.saveBtn, icStatusDone, "Save & Apply", pal.TextBright, c)
 							}),
 						)
 					}),
@@ -227,9 +233,20 @@ func (d *Drawer) Layout(gtx C) D {
 func (d *Drawer) tabButton(gtx C, i int, txt string) D {
 	th := d.app.th
 	active := d.tab == i
-	dims := flatButton(gtx, th, &d.tabBtns[i], txt, active)
+	cl := &d.tabBtns[i]
+	ic := icDescribe
+	if i == tabYAML {
+		ic = icYAML
+	}
+	dims := cl.Layout(gtx, func(gtx C) D {
+		c := pal.TextDim
+		if active || cl.Hovered() {
+			c = pal.TextBright
+		}
+		return insetHV(10, 7).Layout(gtx, func(gtx C) D { return iconText(gtx, th, ic, 13, c, txt) })
+	})
 	if active {
-		fillRect(gtx, pal.Accent, rect(0, dims.Size.Y-gtx.Dp(2), dims.Size.X, dims.Size.Y))
+		fillRRect(gtx, pal.Accent, rect(gtx.Dp(6), dims.Size.Y-gtx.Dp(2), dims.Size.X-gtx.Dp(6), dims.Size.Y), gtx.Dp(1))
 	}
 	return dims
 }

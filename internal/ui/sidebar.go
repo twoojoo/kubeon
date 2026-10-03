@@ -155,49 +155,71 @@ func (s *Sidebar) click(key string) *widget.Clickable {
 
 // Layout draws the sidebar.
 func (s *Sidebar) Layout(gtx C) D {
-	w := gtx.Dp(230)
+	w := gtx.Dp(240)
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
 	gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
 	fill(gtx, pal.Sidebar)
-	th := s.app.th
 	if s.ctxBtn.Clicked(gtx) {
 		s.app.pickContext()
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx C) D {
-			return s.ctxBtn.Layout(gtx, func(gtx C) D {
-				return bg(gtx, pal.Header, func(gtx C) D {
-					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					return insetHV(14, 12).Layout(gtx, func(gtx C) D {
-						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-							layout.Rigid(func(gtx C) D {
-								return labelIcon(gtx, th, 11, pal.TextDim, "CLUSTER", iconChevronDown)
-							}),
-							layout.Rigid(func(gtx C) D {
-								name := "—"
-								switch {
-								case s.app.cluster != nil:
-									name = s.app.cluster.Context
-								case s.app.connecting != "":
-									name = s.app.connecting
-								}
-								return lbl(gtx, th, fontSans, 15, pal.TextBright, name)
-							}),
-						)
-					})
-				})
-			})
-		}),
+		layout.Rigid(s.layoutCluster),
+		layout.Rigid(func(gtx C) D { return hline(gtx, pal.Border) }),
 		layout.Flexed(1, func(gtx C) D {
 			if s.app.cluster == nil {
 				return D{}
 			}
 			rr := s.rows()
-			return material.List(th, &s.list).Layout(gtx, len(rr), func(gtx C, i int) D {
-				return s.layoutRow(gtx, rr[i])
+			return layout.Inset{Top: 4, Bottom: 8}.Layout(gtx, func(gtx C) D {
+				return material.List(s.app.th, &s.list).Layout(gtx, len(rr), func(gtx C, i int) D {
+					return s.layoutRow(gtx, rr[i])
+				})
 			})
 		}),
 	)
+}
+
+// layoutCluster is the Lens-like cluster card: avatar, name, state.
+func (s *Sidebar) layoutCluster(gtx C) D {
+	th := s.app.th
+	name, state, stateC := "No cluster", "disconnected", pal.TextDim
+	switch {
+	case s.app.cluster != nil:
+		name, state, stateC = s.app.cluster.Context, "connected · "+s.app.cluster.Version(), pal.Ok
+	case s.app.connecting != "":
+		name, state, stateC = s.app.connecting, "connecting…", pal.Warn
+	case s.app.connErr != nil:
+		state, stateC = "connection failed", pal.Err
+	}
+	return s.ctxBtn.Layout(gtx, func(gtx C) D {
+		b := pal.Header
+		if s.ctxBtn.Hovered() {
+			b = pal.Hover
+		}
+		return bg(gtx, b, func(gtx C) D {
+			gtx.Constraints.Min.X = gtx.Constraints.Max.X
+			return insetHV(12, 12).Layout(gtx, func(gtx C) D {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx C) D { return avatar(gtx, th, name, 36) }),
+					layout.Rigid(layout.Spacer{Width: 10}.Layout),
+					layout.Flexed(1, func(gtx C) D {
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, pal.TextBright, name) }),
+							layout.Rigid(layout.Spacer{Height: 2}.Layout),
+							layout.Rigid(func(gtx C) D {
+								return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+									layout.Rigid(func(gtx C) D { return dot(gtx, stateC, 7) }),
+									layout.Rigid(layout.Spacer{Width: 5}.Layout),
+									layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, pal.TextDim, state) }),
+								)
+							}),
+						)
+					}),
+					layout.Rigid(func(gtx C) D { return mdi(gtx, icExpand, pal.TextDim, 18) }),
+				)
+			})
+		})
+	})
 }
 
 func (s *Sidebar) layoutRow(gtx C, r sideRow) D {
@@ -210,8 +232,23 @@ func (s *Sidebar) layoutRow(gtx C, r sideRow) D {
 		}
 		return cl.Layout(gtx, func(gtx C) D {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Left: 14, Right: 10, Top: 12, Bottom: 4}.Layout(gtx, func(gtx C) D {
-				return iconLabel(gtx, th, 11, pal.TextDim, chevron(s.collapsed[r.section]), upper(r.section))
+			c := pal.TextDim
+			if cl.Hovered() {
+				c = pal.Text
+			}
+			return layout.Inset{Left: 14, Right: 12, Top: 12, Bottom: 4}.Layout(gtx, func(gtx C) D {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx C) D {
+						ic := sectionIcons[r.section]
+						if ic == nil {
+							ic = icCRD
+						}
+						return mdiInline(gtx, ic, c, 15)
+					}),
+					layout.Rigid(layout.Spacer{Width: 8}.Layout),
+					layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 11, c, upper(r.section)) }),
+					layout.Rigid(func(gtx C) D { return mdiInline(gtx, chevronIcon(s.collapsed[r.section]), c, 14) }),
+				)
 			})
 		})
 	case r.group:
@@ -221,8 +258,16 @@ func (s *Sidebar) layoutRow(gtx C, r sideRow) D {
 		}
 		return cl.Layout(gtx, func(gtx C) D {
 			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return layout.Inset{Left: 22, Right: 10, Top: 4, Bottom: 4}.Layout(gtx, func(gtx C) D {
-				return iconLabel(gtx, th, 12, pal.TextDim, chevron(s.collapsed[r.section]), r.item.title)
+			c := pal.TextDim
+			if cl.Hovered() {
+				c = pal.Text
+			}
+			return layout.Inset{Left: 32, Right: 12, Top: 5, Bottom: 5}.Layout(gtx, func(gtx C) D {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx C) D { return mdiInline(gtx, chevronIcon(s.collapsed[r.section]), c, 13) }),
+					layout.Rigid(layout.Spacer{Width: 4}.Layout),
+					layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 12, c, r.item.title) }),
+				)
 			})
 		})
 	}
@@ -230,29 +275,39 @@ func (s *Sidebar) layoutRow(gtx C, r sideRow) D {
 	if cl.Clicked(gtx) {
 		s.app.openResource(r.item.gvr)
 	}
-	left := unit.Dp(26)
-	if len(r.section) > 4 && r.section[:4] == "crd:" {
-		left = 38
+	left := unit.Dp(30)
+	crd := len(r.section) > 4 && r.section[:4] == "crd:"
+	if crd {
+		left = 50
 	}
 	return cl.Layout(gtx, func(gtx C) D {
 		active := s.active == r.item.gvr
-		h := gtx.Dp(26)
+		h := gtx.Dp(28)
 		sz := image.Pt(gtx.Constraints.Max.X, h)
+		m := gtx.Dp(6)
+		pillR := image.Rect(m, gtx.Dp(1), sz.X-m, h-gtx.Dp(1))
 		switch {
 		case active:
-			fillRect(gtx, pal.Selected, image.Rectangle{Max: sz})
-			fillRect(gtx, pal.Accent, image.Rect(0, 0, gtx.Dp(3), h))
+			fillRRect(gtx, pal.Selected, pillR, gtx.Dp(5))
+			fillRRect(gtx, pal.Accent, image.Rect(m, gtx.Dp(6), m+gtx.Dp(3), h-gtx.Dp(6)), gtx.Dp(2))
 		case cl.Hovered():
-			fillRect(gtx, pal.Hover, image.Rectangle{Max: sz})
+			fillRRect(gtx, pal.Hover, pillR, gtx.Dp(5))
 		}
 		gtx.Constraints = layout.Exact(sz)
 		return layout.Inset{Left: left, Right: 8}.Layout(gtx, func(gtx C) D {
 			return layout.W.Layout(gtx, func(gtx C) D {
-				c := pal.Text
+				c, ic := pal.Text, pal.TextDim
 				if active {
-					c = pal.TextBright
+					c, ic = pal.TextBright, pal.Accent
 				}
-				return lbl(gtx, th, fontSans, 13, c, r.item.title)
+				if crd {
+					return lbl(gtx, th, fontSans, 13, c, r.item.title)
+				}
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx C) D { return mdiInline(gtx, iconFor(r.item.gvr), ic, 15) }),
+					layout.Rigid(layout.Spacer{Width: 9}.Layout),
+					layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 13, c, r.item.title) }),
+				)
 			})
 		})
 	})
@@ -268,9 +323,9 @@ func upper(s string) string {
 	return string(b)
 }
 
-func chevron(collapsed bool) iconKind {
+func chevronIcon(collapsed bool) *widget.Icon {
 	if collapsed {
-		return iconChevronRight
+		return icCollapse
 	}
-	return iconChevronDown
+	return icExpand
 }

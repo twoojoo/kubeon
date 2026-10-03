@@ -60,6 +60,7 @@ type App struct {
 	overlay overlay
 
 	ctxBtn widget.Clickable
+	pfBtn  widget.Clickable
 
 	onInvalidate func() // headless harness hook
 }
@@ -338,7 +339,25 @@ func (a *App) layoutWelcome(gtx C) D {
 	return layout.Center.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical, Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
+				return rbg(gtx, withAlpha(pal.Accent, 0x30), 36, func(gtx C) D {
+					return inset(18).Layout(gtx, func(gtx C) D {
+						ic := icCluster
+						switch {
+						case a.connErr != nil:
+							ic = icCloudOff
+						case a.connecting != "":
+							ic = icRestart
+						}
+						return mdi(gtx, ic, pal.Accent, 40)
+					})
+				})
+			}),
+			layout.Rigid(layout.Spacer{Height: 14}.Layout),
+			layout.Rigid(func(gtx C) D {
 				return lbl(gtx, a.th, fontSans, 28, pal.TextBright, "k9desk")
+			}),
+			layout.Rigid(func(gtx C) D {
+				return lbl(gtx, a.th, fontSans, 13, pal.TextDim, "native Kubernetes IDE · powered by k9s")
 			}),
 			layout.Rigid(layout.Spacer{Height: 12}.Layout),
 			layout.Rigid(func(gtx C) D {
@@ -362,53 +381,99 @@ func (a *App) layoutWelcome(gtx C) D {
 				if a.connecting != "" {
 					return D{}
 				}
-				return button(gtx, a.th, &a.ctxBtn, "Choose context", pal.Accent)
+				return pillButton(gtx, a.th, &a.ctxBtn, icCluster, "Choose context", pal.TextBright, pal.Accent)
 			}),
 		)
 	})
 }
 
 func (a *App) layoutStatus(gtx C) D {
-	h := gtx.Dp(24)
+	h := gtx.Dp(26)
 	gtx.Constraints.Min.Y, gtx.Constraints.Max.Y = h, h
 	fill(gtx, pal.Accent)
+	th := a.th
+	fg := pal.TextBright
+	center := func(w layout.Widget) layout.Widget {
+		return func(gtx C) D {
+			gtx.Constraints.Min.Y = h
+			return layout.W.Layout(gtx, w)
+		}
+	}
+	if a.pfBtn.Clicked(gtx) {
+		a.pickForward()
+	}
 	return insetHV(10, 0).Layout(gtx, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(func(gtx C) D {
-				gtx.Constraints.Min.Y = h
-				return layout.W.Layout(gtx, func(gtx C) D {
-					name := "no cluster"
-					if a.cluster != nil {
-						name = a.cluster.Context + "  ·  " + a.cluster.Version()
-						if n := len(a.cluster.PortForwards()); n > 0 {
-							name += "  ·  " + itoa(n) + " port-forward(s)"
-						}
-					}
-					return lbl(gtx, a.th, fontSans, 12, pal.TextBright, name)
+			layout.Rigid(center(func(gtx C) D {
+				if a.cluster == nil {
+					return iconText(gtx, th, icCloudOff, 12, fg, "no cluster")
+				}
+				return iconText(gtx, th, icCluster, 12, fg, a.cluster.Context)
+			})),
+			layout.Rigid(center(func(gtx C) D {
+				if a.cluster == nil {
+					return D{}
+				}
+				return layout.Inset{Left: 16}.Layout(gtx, func(gtx C) D {
+					return iconText(gtx, th, icInfo, 12, fg, "Kubernetes "+a.cluster.Version())
 				})
-			}),
-			layout.Rigid(layout.Spacer{Width: 24}.Layout),
-			layout.Flexed(1, func(gtx C) D {
-				gtx.Constraints.Min.Y = h
-				return layout.W.Layout(gtx, func(gtx C) D {
-					if a.status == "" || time.Since(a.statusAt) > 8*time.Second && !a.statusErr {
-						return D{}
-					}
-					c := pal.TextBright
-					if a.statusErr {
-						c = rgb(0xffd6d6)
-					}
-					return lbl(gtx, a.th, fontSans, 12, c, a.status)
+			})),
+			layout.Rigid(center(func(gtx C) D {
+				if a.cluster == nil {
+					return D{}
+				}
+				n := len(a.cluster.PortForwards())
+				if n == 0 {
+					return D{}
+				}
+				return layout.Inset{Left: 16}.Layout(gtx, func(gtx C) D {
+					return a.pfBtn.Layout(gtx, func(gtx C) D {
+						return iconText(gtx, th, icForward, 12, fg, itoa(n)+" port-forward(s)")
+					})
 				})
-			}),
-			layout.Rigid(func(gtx C) D {
-				gtx.Constraints.Min.Y = h
-				return layout.E.Layout(gtx, func(gtx C) D {
-					return lbl(gtx, a.th, fontSans, 12, pal.TextBright, ":cmd  /filter  enter details  l logs  s shell  y yaml  d describe  ^d delete")
-				})
-			}),
+			})),
+			layout.Rigid(layout.Spacer{Width: 20}.Layout),
+			layout.Flexed(1, center(func(gtx C) D {
+				if a.status == "" || time.Since(a.statusAt) > 8*time.Second && !a.statusErr {
+					return D{}
+				}
+				if a.statusErr {
+					return rbg(gtx, pal.Err, 4, func(gtx C) D {
+						return insetHV(6, 2).Layout(gtx, func(gtx C) D {
+							return iconText(gtx, th, icError, 12, fg, a.status)
+						})
+					})
+				}
+				return iconText(gtx, th, icStatusDone, 12, fg, a.status)
+			})),
+			layout.Rigid(center(func(gtx C) D {
+				hints := [][2]string{{":", "command"}, {"/", "filter"}, {"l", "logs"}, {"s", "shell"}, {"d", "describe"}, {"y", "yaml"}, {"^d", "delete"}}
+				var ch []layout.FlexChild
+				for _, k := range hints {
+					k := k
+					ch = append(ch, layout.Rigid(func(gtx C) D {
+						return layout.Inset{Left: 10}.Layout(gtx, func(gtx C) D { return keyHint(gtx, th, k[0], k[1]) })
+					}))
+				}
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, ch...)
+			})),
 		)
 	})
+}
+
+// keyHint draws a keyboard chip followed by its meaning.
+func keyHint(gtx C, th *material.Theme, k, what string) D {
+	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(func(gtx C) D {
+			return rbg(gtx, withAlpha(rgb(0x000000), 0x40), 3, func(gtx C) D {
+				return insetHV(5, 1).Layout(gtx, func(gtx C) D {
+					return lbl(gtx, th, fontMono, 11, pal.TextBright, k)
+				})
+			})
+		}),
+		layout.Rigid(layout.Spacer{Width: 4}.Layout),
+		layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, withAlpha(pal.TextBright, 0xd0), what) }),
+	)
 }
 
 func (a *App) invalidate() {

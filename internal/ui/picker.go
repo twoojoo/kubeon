@@ -24,6 +24,7 @@ type Picker struct {
 	allowFree bool
 	onPick    func(string)
 	exact     func(string) bool // free text accepted as-is when true
+	icon      *widget.Icon      // item icon override
 	done      bool
 	focused   bool
 	lastQ     string
@@ -133,9 +134,9 @@ func (p *Picker) Layout(gtx C) D {
 
 	w := min(gtx.Dp(640), gtx.Constraints.Max.X-gtx.Dp(40))
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
-	return bg(gtx, pal.Border, func(gtx C) D {
+	return rborder(gtx, pal.Border, pal.Panel, 10, func(gtx C) D {
 		return inset(1).Layout(gtx, func(gtx C) D {
-			return bg(gtx, pal.Panel, func(gtx C) D {
+			return layout.Inset{}.Layout(gtx, func(gtx C) D {
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 					layout.Rigid(func(gtx C) D {
 						return layout.Inset{Left: 14, Right: 14, Top: 10}.Layout(gtx, func(gtx C) D {
@@ -143,13 +144,19 @@ func (p *Picker) Layout(gtx C) D {
 						})
 					}),
 					layout.Rigid(func(gtx C) D {
-						return insetHV(14, 8).Layout(gtx, func(gtx C) D {
+						return insetHV(14, 10).Layout(gtx, func(gtx C) D {
 							gtx.Constraints.Min.X = gtx.Constraints.Max.X
-							e := material.Editor(th, &p.editor, "Type to filter…")
-							e.TextSize = 15
-							e.Color = pal.TextBright
-							e.HintColor = pal.TextDim
-							return e.Layout(gtx)
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								layout.Rigid(func(gtx C) D { return mdi(gtx, icSearch, pal.Accent, 20) }),
+								layout.Rigid(layout.Spacer{Width: 10}.Layout),
+								layout.Flexed(1, func(gtx C) D {
+									e := material.Editor(th, &p.editor, "Type to filter…")
+									e.TextSize = 16
+									e.Color = pal.TextBright
+									e.HintColor = pal.TextDim
+									return e.Layout(gtx)
+								}),
+							)
 						})
 					}),
 					layout.Rigid(func(gtx C) D { return hline(gtx, pal.Border) }),
@@ -157,7 +164,7 @@ func (p *Picker) Layout(gtx C) D {
 						if len(p.items) == 0 {
 							return D{}
 						}
-						rh := gtx.Dp(28)
+						rh := gtx.Dp(32)
 						n := min(len(p.matches), 14)
 						gtx.Constraints.Max.Y = max(rh, n*rh)
 						gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
@@ -179,16 +186,36 @@ func (p *Picker) Layout(gtx C) D {
 						d := material.List(th, &p.list).Layout(gtx, len(p.matches), func(gtx C, i int) D {
 							sz := image.Pt(gtx.Constraints.Max.X, rh)
 							if i == p.sel {
-								fillRect(gtx, pal.Selected, image.Rectangle{Max: sz})
+								fillRRect(gtx, pal.Selected, image.Rect(gtx.Dp(6), 0, sz.X-gtx.Dp(6), rh), gtx.Dp(5))
 							}
 							gtx.Constraints = layout.Exact(sz)
-							return layout.Inset{Left: unit.Dp(14)}.Layout(gtx, func(gtx C) D {
+							return layout.Inset{Left: unit.Dp(16)}.Layout(gtx, func(gtx C) D {
 								return layout.W.Layout(gtx, func(gtx C) D {
-									c := pal.Text
+									c, ic := pal.Text, pal.TextDim
 									if i == p.sel {
-										c = pal.TextBright
+										c, ic = pal.TextBright, pal.Accent
 									}
-									return lbl(gtx, th, fontSans, 13, c, p.items[p.matches[i]])
+									item := p.items[p.matches[i]]
+									title, sub, hasSub := strings.Cut(item, "  ·  ")
+									return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+										layout.Rigid(func(gtx C) D {
+											ico := p.icon
+											if ico == nil {
+												ico = pickerIcon(item)
+											}
+											return mdi(gtx, ico, ic, 16)
+										}),
+										layout.Rigid(layout.Spacer{Width: 10}.Layout),
+										layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, c, title) }),
+										layout.Rigid(func(gtx C) D {
+											if !hasSub {
+												return D{}
+											}
+											return layout.Inset{Left: 10}.Layout(gtx, func(gtx C) D {
+												return lbl(gtx, th, fontMono, 11, pal.TextDim, sub)
+											})
+										}),
+									)
 								})
 							})
 						})
@@ -241,12 +268,26 @@ func (c *Confirm) Layout(gtx C) D {
 	}
 	w := min(gtx.Dp(460), gtx.Constraints.Max.X-gtx.Dp(40))
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = w, w
-	return bg(gtx, pal.Border, func(gtx C) D {
+	return rborder(gtx, pal.Border, pal.Panel, 10, func(gtx C) D {
 		return inset(1).Layout(gtx, func(gtx C) D {
-			return bg(gtx, pal.Panel, func(gtx C) D {
+			return layout.Inset{}.Layout(gtx, func(gtx C) D {
 				return inset(18).Layout(gtx, func(gtx C) D {
 					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 16, pal.TextBright, c.title) }),
+						layout.Rigid(func(gtx C) D {
+							ic, col := icInfo, pal.Accent
+							if c.danger {
+								ic, col = icWarning, pal.Err
+							}
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								layout.Rigid(func(gtx C) D {
+									return rbg(gtx, withAlpha(col, 0x30), 18, func(gtx C) D {
+										return inset(7).Layout(gtx, func(gtx C) D { return mdi(gtx, ic, col, 20) })
+									})
+								}),
+								layout.Rigid(layout.Spacer{Width: 12}.Layout),
+								layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 17, pal.TextBright, c.title) }),
+							)
+						}),
 						layout.Rigid(layout.Spacer{Height: 10}.Layout),
 						layout.Rigid(func(gtx C) D {
 							l := material.Body1(th, c.msg)
@@ -263,7 +304,7 @@ func (c *Confirm) Layout(gtx C) D {
 									return toggle(gtx, th, &c.fb, "Force (grace 0)", c.force)
 								}),
 								layout.Flexed(1, layout.Spacer{}.Layout),
-								layout.Rigid(func(gtx C) D { return flatButton(gtx, th, &c.cancel, "Cancel", false) }),
+								layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &c.cancel, nil, "Cancel", pal.Text, pal.Hover) }),
 								layout.Rigid(layout.Spacer{Width: 8}.Layout),
 								layout.Rigid(func(gtx C) D {
 									col := pal.Accent
@@ -279,4 +320,22 @@ func (c *Confirm) Layout(gtx C) D {
 			})
 		})
 	})
+}
+
+// pickerIcon picks an icon for a picker entry.
+func pickerIcon(item string) *widget.Icon {
+	if _, gvr, ok := strings.Cut(item, "  ·  "); ok {
+		return iconFor(gvr)
+	}
+	switch {
+	case strings.HasPrefix(item, "ns ") || item == "All namespaces":
+		return icNamespace
+	case strings.HasPrefix(item, "ctx "):
+		return icCluster
+	case strings.Contains(item, "→"):
+		return icForward
+	case strings.Contains(item, ":") && !strings.Contains(item, " "):
+		return icForward
+	}
+	return icCommand
 }

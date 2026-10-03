@@ -16,6 +16,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"github.com/hinshun/vt10x"
 
 	"github.com/giovanni/k9desk/internal/backend"
@@ -65,6 +66,8 @@ func newTerminal(a *App, path, container string) *Terminal {
 func (t *Terminal) Title() string {
 	return "Shell " + shortName(t.path) + "/" + t.container
 }
+
+func (t *Terminal) Icon() *widget.Icon { return icTerminal }
 
 func (t *Terminal) Focused(gtx C) bool { return gtx.Focused(&t.tag) }
 
