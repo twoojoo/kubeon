@@ -30,7 +30,7 @@ func (a *App) handleKeys(gtx C) {
 			key.Filter{Name: "W"}, key.Filter{Name: "N"}, key.Filter{Name: "R"},
 			key.Filter{Name: "F", Required: key.ModShift},
 			key.Filter{Name: "X"}, key.Filter{Name: "C"}, key.Filter{Name: "U"},
-			key.Filter{Name: "V"}, key.Filter{Name: "B"},
+			key.Filter{Name: "V"}, key.Filter{Name: "B"}, key.Filter{Name: "A"},
 			key.Filter{Name: key.NameLeftArrow}, key.Filter{Name: key.NameRightArrow},
 			key.Filter{Name: key.NameSpace},
 			key.Filter{Name: "D", Required: key.ModCtrl},
@@ -63,7 +63,7 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		a.openPalette("")
 	case !nav:
 		return
-	case a.page == xrayPage && e.Name != ":" && e.Name != ";" && e.Name != "N" && e.Name != "0":
+	case a.page == xrayPage && e.Name != ":" && e.Name != ";" && e.Name != "N" && e.Name != "0" && e.Name != "A":
 		if e.Name == "B" {
 			a.back()
 			return
@@ -133,6 +133,8 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		v.details(tabValues)
 	case e.Name == "B":
 		a.back()
+	case e.Name == "A":
+		a.ai.toggle(gtx)
 	case e.Name == "0":
 		a.setNamespace("")
 	}

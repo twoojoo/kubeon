@@ -56,6 +56,7 @@ type App struct {
 
 	sidebar *Sidebar
 	title   *TitleBar
+	ai      *AIPanel
 
 	maximized, winFocused  bool
 	backdropTag, dialogTag int
@@ -108,6 +109,7 @@ func newApp(opts Options, w *app.Window) *App {
 	}
 	a.sidebar = newSidebar(&a)
 	a.title = newTitleBar(&a)
+	a.ai = newAIPanel(&a)
 	a.view = newResourceView(&a)
 	a.ovw = newOverview(&a)
 	a.xray = newXRay(&a)
@@ -248,6 +250,7 @@ func (a *App) connect(kctx string) {
 				return
 			}
 			a.cluster, a.namespaces = c, nss
+			a.ai.reset()
 			a.events, a.unread = nil, 0
 			a.startHealth(c)
 			a.sidebar.reload(c)
@@ -292,7 +295,7 @@ func (a *App) textFocused(gtx C) bool {
 	if a.overlay != nil {
 		return true
 	}
-	return gtx.Focused(&a.view.filter) || a.drawer.focused(gtx) || a.dock.focused(gtx)
+	return gtx.Focused(&a.view.filter) || a.drawer.focused(gtx) || a.dock.focused(gtx) || a.ai.focused(gtx)
 }
 
 func (a *App) layout(gtx C) {
@@ -310,6 +313,15 @@ func (a *App) layout(gtx C) {
 				layout.Rigid(a.sidebar.Layout),
 				layout.Rigid(func(gtx C) D { return vline(gtx, pal.Border) }),
 				layout.Flexed(1, a.layoutMain),
+				layout.Rigid(func(gtx C) D {
+					if !a.ai.open {
+						return D{}
+					}
+					return layout.Flex{}.Layout(gtx,
+						layout.Rigid(func(gtx C) D { return vline(gtx, pal.Border) }),
+						layout.Rigid(a.ai.Layout),
+					)
+				}),
 			)
 		}),
 		layout.Rigid(a.layoutStatus),
@@ -578,4 +590,17 @@ func (a *App) invalidate() {
 	} else if a.onInvalidate != nil {
 		a.onInvalidate()
 	}
+}
+
+// pageTitleSafe names the current main page (for assistant context).
+func (a *App) pageTitleSafe() string {
+	switch a.page {
+	case overviewGVR:
+		return "Cluster overview"
+	case xrayPage:
+		return "XRay of " + titleFor(a.xray.gvr)
+	case "":
+		return ""
+	}
+	return a.view.title
 }

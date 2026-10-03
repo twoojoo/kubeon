@@ -205,7 +205,7 @@ func (a *App) openPalette(prefill string) {
 			return false
 		}
 		switch f[0] {
-		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards", "notify", "notifications", "events", "xray", "helm", "charts", "releases":
+		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards", "notify", "notifications", "events", "ai", "assistant", "chat", "xray", "helm", "charts", "releases":
 			return true
 		}
 		_, ok := backend.LookupAlias(f[0])
@@ -242,6 +242,12 @@ func (a *App) runCommand(cmd string) {
 		return
 	case "pf", "portforwards":
 		a.pickForward()
+		return
+	case "ai", "assistant", "chat":
+		a.ai.open = true
+		if len(f) > 1 {
+			a.ai.send(strings.Join(f[1:], " "))
+		}
 		return
 	case "notify", "notifications", "events":
 		a.overlay = newNotifPanel(a)

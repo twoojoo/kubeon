@@ -23,7 +23,33 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | XRay | k9s dependency tree for deploy/sts/ds/rs/svc/pods as collapsible tree or pannable graph |
 | Notifications | Health watcher (CrashLoop/ImagePull/OOM, node NotReady, deployment degraded/rollout complete) → desktop notifications via D-Bus + in-app bell |
 | Overview | Nodes, pods by status, deployments health, CPU/memory requests (+usage with metrics-server), warning events |
-| Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |
+| Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `a` assistant, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |
+
+## Assistant (AI)
+
+Right-side panel (`a`, the **Assistant** button in the title bar, or `:ai <question>`)
+that troubleshoots the cluster with read-only tools: overview, list, YAML, describe,
+events, logs (multi-pod, previous, grep) and XRay. Changes are only **proposed**
+(`scale`, `restart`, `delete`, `apply`, `cordon`, `uncordon`) and run after you approve
+them in a confirmation dialog.
+
+| Provider | API | Key |
+|---|---|---|
+| Anthropic (Claude, default `claude-opus-5-5`) | official `anthropic-sdk-go`, streaming, server-side refusal fallback | `$ANTHROPIC_API_KEY` / `ant auth login` |
+| OpenAI, Google Gemini, Mistral, Groq, OpenRouter, DeepSeek, xAI | OpenAI Chat Completions (`openai-go`) | `$OPENAI_API_KEY`, `$GEMINI_API_KEY`, … |
+| Ollama, LM Studio, vLLM, llama.cpp, LocalAI (local) | OpenAI-compatible endpoint | none |
+
+Settings (gear icon) store provider, model, endpoint and optionally a key in
+`~/.config/k9desk/ai.json` (mode 600); models can be listed from the endpoint. The
+assistant can be disabled per kube context.
+
+Privacy: Secret values are never sent (data/stringData replaced, keys kept); env
+vars with sensitive names, bearer tokens, passwords in URLs/logs, JWTs, cloud and
+VCS tokens and PEM private keys are redacted from every tool output.
+
+Local models need reliable tool calling (e.g. Llama 3.1 8B+, Qwen 2.5 7B+); very
+small models may describe tool calls instead of making them — k9desk executes
+well-formed JSON calls written as text, but larger models give far better answers.
 
 ## Window chrome
 

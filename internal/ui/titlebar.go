@@ -23,7 +23,7 @@ const titleBarHeight = unit.Dp(40)
 type TitleBar struct {
 	app                      *App
 	minBtn, maxBtn, closeBtn widget.Clickable
-	nsBtn, searchBtn         widget.Clickable
+	nsBtn, searchBtn, aiBtn  widget.Clickable
 }
 
 func newTitleBar(a *App) *TitleBar { return &TitleBar{app: a} }
@@ -49,6 +49,9 @@ func (t *TitleBar) Layout(gtx C) D {
 	}
 	if t.closeBtn.Clicked(gtx) {
 		t.perform(system.ActionClose)
+	}
+	if t.aiBtn.Clicked(gtx) {
+		a.ai.toggle(gtx)
 	}
 	if t.nsBtn.Clicked(gtx) {
 		a.pickNamespace()
@@ -122,7 +125,37 @@ func (t *TitleBar) Layout(gtx C) D {
 	} else {
 		moveRect(image.Rect(0, 0, sx, h))
 	}
-	moveRect(image.Rect(sx+bw, 0, w-ctrlW, h))
+	// assistant toggle, left of the window controls
+	var aiCall op.CallOp
+	var aiDims D
+	if a.cluster != nil {
+		m := op.Record(gtx.Ops)
+		ag := gtx
+		ag.Constraints = layout.Constraints{Max: image.Pt(gtx.Dp(160), h)}
+		aiDims = t.aiBtn.Layout(ag, func(gtx C) D {
+			b, c := colorNRGBA{}, pal.Text
+			switch {
+			case a.ai.open:
+				b, c = withAlpha(pal.Accent, 0x40), pal.TextBright
+			case t.aiBtn.Hovered():
+				b = pal.Hover
+			}
+			return rbg(gtx, b, 6, func(gtx C) D {
+				return insetHV(9, 5).Layout(gtx, func(gtx C) D {
+					return iconText(gtx, th, icAI, 12, c, "Assistant")
+				})
+			})
+		})
+		aiCall = m.Stop()
+	}
+	aiX := w - ctrlW - gtx.Dp(8) - aiDims.Size.X
+	moveRect(image.Rect(sx+bw, 0, aiX, h))
+	if aiDims.Size.X > 0 {
+		moveRect(image.Rect(aiX+aiDims.Size.X, 0, w-ctrlW, h))
+		st := op.Offset(image.Pt(aiX, (h-aiDims.Size.Y)/2)).Push(gtx.Ops)
+		aiCall.Add(gtx.Ops)
+		st.Pop()
+	}
 	if nsDims.Size.X > 0 {
 		st := op.Offset(image.Pt(nsX, nsY)).Push(gtx.Ops)
 		nsCall.Add(gtx.Ops)
