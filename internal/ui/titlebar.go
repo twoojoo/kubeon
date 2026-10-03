@@ -23,7 +23,7 @@ const titleBarHeight = unit.Dp(40)
 type TitleBar struct {
 	app                      *App
 	minBtn, maxBtn, closeBtn widget.Clickable
-	searchBtn                widget.Clickable
+	nsBtn, searchBtn         widget.Clickable
 }
 
 func newTitleBar(a *App) *TitleBar { return &TitleBar{app: a} }
@@ -50,6 +50,9 @@ func (t *TitleBar) Layout(gtx C) D {
 	if t.closeBtn.Clicked(gtx) {
 		t.perform(system.ActionClose)
 	}
+	if t.nsBtn.Clicked(gtx) {
+		a.pickNamespace()
+	}
 	if t.searchBtn.Clicked(gtx) {
 		a.openPalette("")
 	}
@@ -74,7 +77,37 @@ func (t *TitleBar) Layout(gtx C) D {
 	bh := gtx.Dp(28)
 	sx := (w - bw) / 2
 
-	// drag handles on the empty regions (left of and right of the search box)
+	// namespace selector right after the sidebar divider (recorded first so
+	// its box can be excluded from the drag handles)
+	nsX := sideW + gtx.Dp(10)
+	var nsCall op.CallOp
+	var nsDims D
+	if a.cluster != nil {
+		m := op.Record(gtx.Ops)
+		ng := gtx
+		ng.Constraints = layout.Constraints{Max: image.Pt(max(0, sx-nsX-gtx.Dp(10)), h)}
+		nsDims = t.nsBtn.Layout(ng, func(gtx C) D {
+			b := colorNRGBA{}
+			if t.nsBtn.Hovered() {
+				b = pal.Hover
+			}
+			return rbg(gtx, b, 6, func(gtx C) D {
+				return insetHV(8, 5).Layout(gtx, func(gtx C) D {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx C) D { return mdi(gtx, icNamespace, pal.TextDim, 15) }),
+						layout.Rigid(layout.Spacer{Width: 7}.Layout),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, fg, nsLabel(a.ns)) }),
+						layout.Rigid(layout.Spacer{Width: 2}.Layout),
+						layout.Rigid(func(gtx C) D { return mdi(gtx, icExpand, pal.TextDim, 16) }),
+					)
+				})
+			})
+		})
+		nsCall = m.Stop()
+	}
+	nsY := (h - nsDims.Size.Y) / 2
+
+	// drag handles on the empty regions
 	moveRect := func(r image.Rectangle) {
 		if r.Dx() <= 0 {
 			return
@@ -83,8 +116,18 @@ func (t *TitleBar) Layout(gtx C) D {
 		system.ActionInputOp(system.ActionMove).Add(gtx.Ops)
 		st.Pop()
 	}
-	moveRect(image.Rect(0, 0, sx, h))
+	if nsDims.Size.X > 0 {
+		moveRect(image.Rect(0, 0, nsX, h))
+		moveRect(image.Rect(nsX+nsDims.Size.X, 0, sx, h))
+	} else {
+		moveRect(image.Rect(0, 0, sx, h))
+	}
 	moveRect(image.Rect(sx+bw, 0, w-ctrlW, h))
+	if nsDims.Size.X > 0 {
+		st := op.Offset(image.Pt(nsX, nsY)).Push(gtx.Ops)
+		nsCall.Add(gtx.Ops)
+		st.Pop()
+	}
 
 	// brand, aligned with the sidebar
 	st := op.Offset(image.Pt(gtx.Dp(14), 0)).Push(gtx.Ops)

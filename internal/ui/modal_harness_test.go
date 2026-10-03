@@ -40,3 +40,13 @@ func TestModalDismissOnBackdrop(t *testing.T) {
 		h.waitFor("overlay closed", func() bool { return a.overlay == nil })
 	}
 }
+
+func TestTitleBarNamespace(t *testing.T) {
+	h := newHarness(t, Options{Namespace: "demo", Resource: "po"})
+	a := h.a
+	h.waitFor("pods", func() bool { return a.view.snap != nil && len(a.view.snap.Rows) > 0 })
+	// namespace selector sits right after the 240dp sidebar divider
+	h.click(290, 20)
+	h.waitFor("ns picker", func() bool { p, ok := a.overlay.(*Picker); return ok && p.title == "Namespace" })
+	h.shot("35-titlebar-ns-picker")
+}
