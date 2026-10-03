@@ -6,6 +6,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
@@ -22,27 +23,10 @@ const titleBarHeight = unit.Dp(40)
 type TitleBar struct {
 	app                      *App
 	minBtn, maxBtn, closeBtn widget.Clickable
-	ctxBtn, nsBtn, searchBtn widget.Clickable
+	searchBtn                widget.Clickable
 }
 
 func newTitleBar(a *App) *TitleBar { return &TitleBar{app: a} }
-
-// moveArea marks the current constraints as a window drag handle.
-func moveArea(gtx C) D {
-	sz := gtx.Constraints.Max
-	defer clip.Rect{Max: sz}.Push(gtx.Ops).Pop()
-	system.ActionInputOp(system.ActionMove).Add(gtx.Ops)
-	return D{Size: sz}
-}
-
-// moveBehind lays out w and makes its whole box a drag handle beneath it.
-func moveBehind(gtx C, w layout.Widget) D {
-	d := w(gtx)
-	st := clip.Rect{Max: d.Size}.Push(gtx.Ops)
-	system.ActionInputOp(system.ActionMove).Add(gtx.Ops)
-	st.Pop()
-	return d
-}
 
 func (t *TitleBar) perform(act system.Action) {
 	if t.app.w != nil {
@@ -66,12 +50,6 @@ func (t *TitleBar) Layout(gtx C) D {
 	if t.closeBtn.Clicked(gtx) {
 		t.perform(system.ActionClose)
 	}
-	if t.ctxBtn.Clicked(gtx) {
-		a.pickContext()
-	}
-	if t.nsBtn.Clicked(gtx) {
-		a.pickNamespace()
-	}
 	if t.searchBtn.Clicked(gtx) {
 		a.openPalette("")
 	}
@@ -80,9 +58,9 @@ func (t *TitleBar) Layout(gtx C) D {
 	w := gtx.Constraints.Max.X
 	gtx.Constraints = layout.Exact(image.Pt(w, h))
 	dim := !a.winFocused && a.w != nil
-	fg, fgDim := pal.TextBright, pal.Text
+	fg := pal.TextBright
 	if dim {
-		fg, fgDim = pal.TextDim, pal.TextDim
+		fg = pal.TextDim
 	}
 	// same surface as the sidebar/panels; the brand block lines up with
 	// the sidebar via a divider
@@ -91,98 +69,71 @@ func (t *TitleBar) Layout(gtx C) D {
 	fillRect(gtx, pal.Border, image.Rect(sideW, gtx.Dp(8), sideW+gtx.Dp(1), h-gtx.Dp(8)))
 	fillRect(gtx, pal.Border, image.Rect(0, h-gtx.Dp(1), w, h))
 
-	center := func(wd layout.Widget) layout.Widget {
-		return func(gtx C) D {
-			gtx.Constraints.Min.Y = h
-			return layout.W.Layout(gtx, wd)
-		}
-	}
+	ctrlW := 3 * gtx.Dp(46)
+	bw := min(gtx.Dp(420), max(gtx.Dp(160), w-2*sideW-ctrlW))
+	bh := gtx.Dp(28)
+	sx := (w - bw) / 2
 
-	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		// brand (aligned with the sidebar)
-		layout.Rigid(func(gtx C) D {
-			gtx.Constraints = layout.Exact(image.Pt(sideW, h))
-			return moveBehind(gtx, func(gtx C) D {
+	// drag handles on the empty regions (left of and right of the search box)
+	moveRect := func(r image.Rectangle) {
+		if r.Dx() <= 0 {
+			return
+		}
+		st := clip.Rect(r).Push(gtx.Ops)
+		system.ActionInputOp(system.ActionMove).Add(gtx.Ops)
+		st.Pop()
+	}
+	moveRect(image.Rect(0, 0, sx, h))
+	moveRect(image.Rect(sx+bw, 0, w-ctrlW, h))
+
+	// brand, aligned with the sidebar
+	st := op.Offset(image.Pt(gtx.Dp(14), 0)).Push(gtx.Ops)
+	bg := gtx
+	bg.Constraints = layout.Exact(image.Pt(sideW-gtx.Dp(14), h))
+	layout.W.Layout(bg, func(gtx C) D {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+			layout.Rigid(func(gtx C) D { return t.logo(gtx) }),
+			layout.Rigid(layout.Spacer{Width: 10}.Layout),
+			layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, "k9desk") }),
+		)
+	})
+	st.Pop()
+
+	// command/search box, centered on the window
+	if a.cluster != nil {
+		st := op.Offset(image.Pt(sx, (h-bh)/2)).Push(gtx.Ops)
+		sg := gtx
+		sg.Constraints = layout.Exact(image.Pt(bw, bh))
+		t.searchBtn.Layout(sg, func(gtx C) D {
+			b := pal.Border
+			if t.searchBtn.Hovered() {
+				b = pal.TextDim
+			}
+			return rborder(gtx, b, pal.Bg, 7, func(gtx C) D {
 				gtx.Constraints.Min = gtx.Constraints.Max
-				return layout.Inset{Left: 14}.Layout(gtx, center(func(gtx C) D {
+				return insetHV(10, 0).Layout(gtx, func(gtx C) D {
 					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-						layout.Rigid(func(gtx C) D { return t.logo(gtx) }),
-						layout.Rigid(layout.Spacer{Width: 10}.Layout),
-						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, "k9desk") }),
+						layout.Rigid(func(gtx C) D { return mdi(gtx, icSearch, pal.TextDim, 15) }),
+						layout.Rigid(layout.Spacer{Width: 8}.Layout),
+						layout.Flexed(1, func(gtx C) D {
+							gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
+							return layout.W.Layout(gtx, func(gtx C) D {
+								return lbl(gtx, th, fontSans, 12, pal.TextDim, "Search resources, run commands…")
+							})
+						}),
+						layout.Rigid(func(gtx C) D { return keyChip(gtx, th, "Ctrl K") }),
 					)
-				}))
-			})
-		}),
-		// breadcrumb: cluster › namespace › page
-		layout.Rigid(center(func(gtx C) D {
-			if a.cluster == nil {
-				return D{}
-			}
-			return layout.Inset{Left: 10}.Layout(gtx, func(gtx C) D {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-					layout.Rigid(func(gtx C) D {
-						return crumb(gtx, &t.ctxBtn, func(gtx C) D {
-							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-								layout.Rigid(func(gtx C) D { return avatar(gtx, th, a.cluster.Context, 18) }),
-								layout.Rigid(layout.Spacer{Width: 7}.Layout),
-								layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, fg, a.cluster.Context) }),
-								layout.Rigid(func(gtx C) D { return mdi(gtx, icExpand, pal.TextDim, 16) }),
-							)
-						})
-					}),
-					layout.Rigid(func(gtx C) D { return mdi(gtx, icCollapse, pal.Border, 16) }),
-					layout.Rigid(func(gtx C) D {
-						return crumb(gtx, &t.nsBtn, func(gtx C) D {
-							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-								layout.Rigid(func(gtx C) D { return mdi(gtx, icNamespace, pal.TextDim, 14) }),
-								layout.Rigid(layout.Spacer{Width: 6}.Layout),
-								layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, fgDim, nsLabel(a.ns)) }),
-								layout.Rigid(func(gtx C) D { return mdi(gtx, icExpand, pal.TextDim, 16) }),
-							)
-						})
-					}),
-					layout.Rigid(func(gtx C) D { return mdi(gtx, icCollapse, pal.Border, 16) }),
-					layout.Rigid(func(gtx C) D {
-						return layout.Inset{Left: 6}.Layout(gtx, func(gtx C) D {
-							return lbl(gtx, th, fontSans, 13, fgDim, a.pageTitle())
-						})
-					}),
-				)
-			})
-		})),
-		layout.Flexed(1, moveArea),
-		// command/search box
-		layout.Rigid(center(func(gtx C) D {
-			if a.cluster == nil {
-				return D{}
-			}
-			bw := min(gtx.Dp(380), max(gtx.Dp(160), w/4))
-			gtx.Constraints = layout.Exact(image.Pt(bw, gtx.Dp(28)))
-			return t.searchBtn.Layout(gtx, func(gtx C) D {
-				b := pal.Border
-				if t.searchBtn.Hovered() {
-					b = pal.TextDim
-				}
-				return rborder(gtx, b, pal.Bg, 7, func(gtx C) D {
-					gtx.Constraints.Min = gtx.Constraints.Max
-					return insetHV(10, 0).Layout(gtx, func(gtx C) D {
-						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-							layout.Rigid(func(gtx C) D { return mdi(gtx, icSearch, pal.TextDim, 15) }),
-							layout.Rigid(layout.Spacer{Width: 8}.Layout),
-							layout.Flexed(1, func(gtx C) D {
-								gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
-								return layout.W.Layout(gtx, func(gtx C) D {
-									return lbl(gtx, th, fontSans, 12, pal.TextDim, "Search resources, run commands…")
-								})
-							}),
-							layout.Rigid(func(gtx C) D { return keyChip(gtx, th, "Ctrl K") }),
-						)
-					})
 				})
 			})
-		})),
-		layout.Flexed(1, moveArea),
-		// window controls
+		})
+		st.Pop()
+	}
+
+	// window controls
+	st = op.Offset(image.Pt(w-ctrlW, 0)).Push(gtx.Ops)
+	cg := gtx
+	cg.Constraints = layout.Exact(image.Pt(ctrlW, h))
+	layout.Flex{}.Layout(cg,
 		layout.Rigid(func(gtx C) D { return t.winButton(gtx, &t.minBtn, glyphMinimize, false) }),
 		layout.Rigid(func(gtx C) D {
 			g := glyphMaximize
@@ -193,18 +144,8 @@ func (t *TitleBar) Layout(gtx C) D {
 		}),
 		layout.Rigid(func(gtx C) D { return t.winButton(gtx, &t.closeBtn, glyphClose, true) }),
 	)
-}
-
-func crumb(gtx C, cl *widget.Clickable, w layout.Widget) D {
-	return cl.Layout(gtx, func(gtx C) D {
-		b := colorNRGBA{}
-		if cl.Hovered() {
-			b = pal.Hover
-		}
-		return rbg(gtx, b, 6, func(gtx C) D {
-			return insetHV(7, 4).Layout(gtx, w)
-		})
-	})
+	st.Pop()
+	return D{Size: image.Pt(w, h)}
 }
 
 func keyChip(gtx C, th *material.Theme, k string) D {
@@ -301,17 +242,4 @@ func (t *TitleBar) winButton(gtx C, cl *widget.Clickable, g winGlyph, danger boo
 		paint.FillShape(gtx.Ops, c, clip.Stroke{Path: p.End(), Width: sw}.Op())
 		return D{Size: image.Pt(w, h)}
 	})
-}
-
-// pageTitle names the current main page for the breadcrumb.
-func (a *App) pageTitle() string {
-	switch a.page {
-	case overviewGVR:
-		return "Overview"
-	case xrayPage:
-		return "XRay · " + titleFor(a.xray.gvr)
-	case "":
-		return ""
-	}
-	return a.view.title
 }

@@ -27,8 +27,8 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 
 ## Window chrome
 
-k9desk draws its own title bar (Lens-like: brand, cluster › namespace › page
-breadcrumb, command search, window controls). Gio is vendored in
+k9desk draws its own title bar (brand, centered command search, window
+controls). Gio is vendored in
 `third_party/gio` with a small Wayland patch (`third_party/_gio-patches`,
 re-apply with `scripts/vendor-gio.sh`):
 
