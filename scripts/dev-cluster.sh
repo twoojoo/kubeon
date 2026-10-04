@@ -25,11 +25,13 @@ case "${1:-up}" in
     "$KIND" export kubeconfig --name "$NAME" --kubeconfig "$KCFG"
     kc apply -f "$ROOT/testdata/fixtures.yaml"
     # integration tests expect settled fixtures: healthy deployments and the
-    # crasher pod already in CrashLoopBackOff (takes a few restarts)
+    # crasher pod in CrashLoopBackOff. Early restarts back off for seconds
+    # only (Running/Error flip quickly); from the 4th the back-off is >= 80s,
+    # long enough for the tests to see CrashLoopBackOff.
     kc -n demo rollout status deploy/web deploy/jsonlog --timeout 180s
-    for _ in $(seq 1 90); do
-      if kc -n demo get pods -l app=crasher \
-          -o jsonpath='{.items[*].status.containerStatuses[*].state.waiting.reason}' | grep -q CrashLoopBackOff; then
+    for _ in $(seq 1 150); do
+      state="$(kc -n demo get pods -l app=crasher -o jsonpath='{range .items[*].status.containerStatuses[*]}{.restartCount} {.state.waiting.reason}{"\n"}{end}')"
+      if awk '$1 >= 4 && $2 == "CrashLoopBackOff" {ok=1} END {exit !ok}' <<<"$state"; then
         break
       fi
       sleep 2
