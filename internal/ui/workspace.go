@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"image"
-	"os/exec"
 	"strings"
 
 	"gioui.org/layout"
@@ -11,15 +10,14 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/giovanni/kubeon/internal/desktop"
 	"github.com/giovanni/kubeon/internal/prefs"
 )
 
 // ---- port-forwards ----
 
 // openBrowser opens url with the desktop handler.
-func openBrowser(url string) error {
-	return exec.Command("xdg-open", url).Start()
-}
+func openBrowser(url string) error { return desktop.Open(url) }
 
 // startSavedForwards re-opens the auto-start forwards of the context.
 func (a *App) startSavedForwards(c *backend.Cluster) {

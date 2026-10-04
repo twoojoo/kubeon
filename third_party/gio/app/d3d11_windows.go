@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"unsafe"
 
@@ -31,20 +32,25 @@ func init() {
 			if debugDirectX {
 				flags |= d3d11.CREATE_DEVICE_DEBUG
 			}
-			dev, ctx, _, err := d3d11.CreateDevice(
-				d3d11.DRIVER_TYPE_HARDWARE,
-				flags,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("NewContext: %v", err)
+			// kubeon: fall back to the WARP software rasterizer when no
+			// usable hardware device exists (VMs, remote desktops, CI).
+			var errs []error
+			for _, typ := range []uint32{d3d11.DRIVER_TYPE_HARDWARE, d3d11.DRIVER_TYPE_WARP} {
+				dev, ctx, _, err := d3d11.CreateDevice(typ, flags)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("NewContext: %v", err))
+					continue
+				}
+				swchain, err := d3d11.CreateSwapChain(dev, hwnd)
+				if err != nil {
+					d3d11.IUnknownRelease(unsafe.Pointer(ctx), ctx.Vtbl.Release)
+					d3d11.IUnknownRelease(unsafe.Pointer(dev), dev.Vtbl.Release)
+					errs = append(errs, err)
+					continue
+				}
+				return &d3d11Context{win: w, dev: dev, ctx: ctx, swchain: swchain}, nil
 			}
-			swchain, err := d3d11.CreateSwapChain(dev, hwnd)
-			if err != nil {
-				d3d11.IUnknownRelease(unsafe.Pointer(ctx), ctx.Vtbl.Release)
-				d3d11.IUnknownRelease(unsafe.Pointer(dev), dev.Vtbl.Release)
-				return nil, err
-			}
-			return &d3d11Context{win: w, dev: dev, ctx: ctx, swchain: swchain}, nil
+			return nil, errors.Join(errs...)
 		},
 	})
 }

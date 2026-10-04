@@ -159,6 +159,12 @@ static void setWindowStandardButtonHidden(CFTypeRef windowRef, NSWindowButton bt
 	}
 }
 
+static NSInteger eventClickCount(CFTypeRef evt) {
+	@autoreleasepool {
+		return [(__bridge NSEvent*)evt clickCount];
+	}
+}
+
 static void performWindowDragWithEvent(CFTypeRef windowRef, CFTypeRef evt) {
 	@autoreleasepool {
 		NSWindow *window = (__bridge NSWindow *)windowRef;
@@ -507,9 +513,10 @@ func (w *window) Configure(options []Option) {
 	C.setWindowTitlebarAppearsTransparent(window, barTrans)
 	C.setWindowTitleVisibility(window, titleVis)
 	C.setWindowStyleMask(window, mask)
-	C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
-	C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, barTrans)
-	C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, barTrans)
+	// kubeon: keep the native traffic lights over the custom titlebar.
+	C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, C.int(C.NO))
+	C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, C.int(C.NO))
+	C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, C.int(C.NO))
 	// When toggling the titlebar, the layer doesn't update its frame
 	// until the next resize. Force it.
 	C.resetLayerFrame(w.view)
@@ -706,6 +713,11 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 		if ok && w.config.Mode != Fullscreen {
 			switch act {
 			case system.ActionMove:
+				// kubeon: double-click on a move area zooms like a native titlebar.
+				if btn == pointer.ButtonPrimary && C.eventClickCount(evt) == 2 {
+					C.zoomWindow(C.windowForView(w.view))
+					return
+				}
 				C.performWindowDragWithEvent(C.windowForView(w.view), evt)
 				return
 			}

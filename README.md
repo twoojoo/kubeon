@@ -2,7 +2,8 @@
 
 Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 
-- **UI**: [Gio](https://gioui.org) (GPU immediate-mode, pure Go, Wayland/X11).
+- **UI**: [Gio](https://gioui.org) (GPU immediate-mode, pure Go): Linux (Wayland/X11),
+  Windows (Direct3D 11), macOS (Metal).
 - **Engine**: [k9s](https://github.com/derailed/k9s) v0.51.0 backend packages
   (`client`, `watch` informers, `dao`, `model`, `render`) vendored in
   `third_party/k9s` with rewritten import paths (Apache-2.0, see its LICENSE).
@@ -25,7 +26,7 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | Selection | Ctrl+click, Shift+click, `space`, Ctrl+A; bulk delete/restart/cordon with one confirmation; right-click context menu with every action for the row (or the selection) |
 | Workspace | Tabs (Ctrl+T / Ctrl+W / Ctrl+Tab), bookmarks of resource+namespace+filter (`m`, sidebar section, `:bm`), port-forward manager with pinned forwards restored on connect and open-in-browser |
 | Appearance | Dark and light themes (title bar toggle, `:theme`), preferences panel (Ctrl+, or gear) |
-| Notifications | Health watcher (CrashLoop/ImagePull/OOM, node NotReady, deployment degraded/rollout complete) → desktop notifications via D-Bus + in-app bell |
+| Notifications | Health watcher (CrashLoop/ImagePull/OOM, node NotReady, deployment degraded/rollout complete) → desktop notifications (D-Bus on Linux, Notification Center on macOS, toasts on Windows) + in-app bell |
 | Overview | Nodes, pods by status, deployments health, CPU/memory requests (+usage with metrics-server), warning events |
 | Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `a` assistant, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |
 
@@ -55,17 +56,33 @@ Local models need reliable tool calling (e.g. Llama 3.1 8B+, Qwen 2.5 7B+); very
 small models may describe tool calls instead of making them — kubeon executes
 well-formed JSON calls written as text, but larger models give far better answers.
 
+## Install
+
+Release packages (GitHub releases, or build them yourself — see Packaging):
+
+| OS | Packages | Notes |
+|---|---|---|
+| Linux amd64/arm64 | `.AppImage`, `.deb`, `.rpm`, `.tar.gz` | glibc ≥ 2.34 (Ubuntu 22.04+, Debian 12+, Fedora 35+); Wayland or X11 |
+| Windows 10+ amd64/arm64 | portable `.zip` (`kubeon.exe`) | unsigned: SmartScreen asks once ("More info → Run anyway") |
+| macOS 11+ (universal) | `.dmg`, `.zip` | ad-hoc signed unless built with a Developer ID: first launch via right-click → Open, or `xattr -dr com.apple.quarantine /Applications/kubeon.app` |
+
+kubeon reads `$KUBECONFIG` / `~/.kube/config` like kubectl. Started from a desktop
+launcher (Finder, Dock, app menu) it loads the login shell environment first, so
+exec credential plugins (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`, …) on your
+shell `PATH` work. `kubeon --version` prints the version.
+
 ## Window chrome
 
-kubeon draws its own title bar (brand, centered command search, window
-controls). Gio is vendored in
-`third_party/gio` with a small Wayland patch (`third_party/_gio-patches`,
-re-apply with `scripts/vendor-gio.sh`):
+kubeon draws its own title bar (brand, namespace, centered command search,
+window controls). Gio is vendored in `third_party/gio` with small patches
+(`third_party/_gio-patches`, re-apply with `scripts/vendor-gio.sh`):
 
-- drag the title bar of a maximized window to restore & move it
-- double-click the title bar to maximize / restore
-- right-click the title bar for the compositor window menu
-- window mode stays in sync with compositor actions (Super+↑, drag-to-top, dock restore)
+- Linux/Wayland: drag the title bar of a maximized window to restore & move it,
+  double-click to maximize / restore, right-click for the compositor window menu,
+  window mode stays in sync with compositor actions (Super+↑, drag-to-top, dock restore)
+- macOS: native traffic lights over the custom title bar, double-click zooms
+- Windows: native caption behaviour (snap, double-click, system menu);
+  Direct3D 11 falls back to the WARP software rasterizer without a GPU (VMs, RDP)
 
 ## Build & run
 
@@ -77,6 +94,27 @@ make build            # release binary ./kubeon (uses $KUBECONFIG / ~/.kube/conf
 Linux system deps: Wayland/EGL/xkbcommon (present). For X11 + Vulkan support install
 `libx11-dev libx11-xcb-dev libxkbcommon-x11-dev libxcursor-dev libxfixes-dev libvulkan-dev`
 and build with `make build GIO_TAGS=`.
+
+## Packaging
+
+Everything lands in `dist/`; the version comes from `git describe` (override with `VERSION=`).
+
+```sh
+make icons            # regenerate packaging/icons (png/ico/icns) from scripts/icongen
+make package-linux    # Docker (Ubuntu 22.04 + full Gio deps): AppImage, deb, rpm, tar.gz for the host arch
+make package-windows  # cross-compiled from any OS (pure Go): zips for amd64 + arm64, icon/manifest/version via go-winres
+make package-macos    # on a Mac: universal kubeon.app (arm64+amd64), dmg, zip
+```
+
+macOS signing/notarization is optional: `MACOS_SIGN_IDENTITY="Developer ID Application: …"`
+and `MACOS_NOTARY_PROFILE=<notarytool keychain profile>`. In CI set the secrets
+`MACOS_CERT_P12` (base64), `MACOS_CERT_PASSWORD`, `MACOS_NOTARY_APPLE_ID`,
+`MACOS_NOTARY_TEAM_ID`, `MACOS_NOTARY_PASSWORD`.
+
+CI (`.github/workflows/ci.yml`) runs unit tests, the kind integration suite with
+headless UI screenshots, builds every package on Linux (amd64 + arm64), Windows
+and macOS runners with a launch smoke test, and on a `v*` tag publishes them as a
+GitHub release with `SHA256SUMS.txt`.
 
 ## Development (safe by construction)
 
@@ -100,5 +138,9 @@ cmd/kubeon            entry point, flags, logging (~/.cache/kubeon/kubeon.log)
 internal/backend      facade over k9s: Cluster, TableWatch snapshots, actions, logs, exec, port-forward, overview
 internal/ui           Gio app: table, sidebar, drawer, dock (logs/terminal), picker/palette, overview, icons
 internal/safety       kubeconfig/context guard for dev builds
+internal/desktop      OS integration: open URLs, login-shell env import, Wayland cursor settings
+internal/notify       desktop notifications (D-Bus / Notification Center / Windows toasts)
+packaging/            icons, Linux desktop entry + Dockerfile + nfpm, macOS Info.plist, Windows resources
+scripts/package-*.sh  release packaging per OS (make package-linux|windows|macos)
 third_party/k9s       vendored k9s engine (generated by scripts/vendor-k9s.sh — do not edit by hand)
 ```

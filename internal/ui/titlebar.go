@@ -83,6 +83,10 @@ func (t *TitleBar) Layout(gtx C) D {
 	fillRect(gtx, pal.Border, image.Rect(0, h-gtx.Dp(1), w, h))
 
 	ctrlW := 3 * gtx.Dp(46)
+	brandX := gtx.Dp(14)
+	if nativeWindowControls {
+		ctrlW, brandX = 0, gtx.Dp(trafficLightsWidth)
+	}
 	bw := min(gtx.Dp(420), max(gtx.Dp(160), w-2*sideW-ctrlW))
 	bh := gtx.Dp(28)
 	sx := (w - bw) / 2
@@ -160,7 +164,11 @@ func (t *TitleBar) Layout(gtx C) D {
 		aiCall = m.Stop()
 	}
 
-	aiX := w - ctrlW - gtx.Dp(8) - aiDims.Size.X
+	edge := gtx.Dp(8)
+	if ctrlW == 0 {
+		edge = gtx.Dp(14)
+	}
+	aiX := w - ctrlW - edge - aiDims.Size.X
 	// policy badges, right-aligned before the toolbar buttons
 	{
 		m := op.Record(gtx.Ops)
@@ -189,9 +197,9 @@ func (t *TitleBar) Layout(gtx C) D {
 	}
 
 	// brand, aligned with the sidebar
-	st := op.Offset(image.Pt(gtx.Dp(14), 0)).Push(gtx.Ops)
+	st := op.Offset(image.Pt(brandX, 0)).Push(gtx.Ops)
 	bg := gtx
-	bg.Constraints = layout.Exact(image.Pt(sideW-gtx.Dp(14), h))
+	bg.Constraints = layout.Exact(image.Pt(sideW-brandX, h))
 	layout.W.Layout(bg, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D { return t.logo(gtx) }),
@@ -223,7 +231,7 @@ func (t *TitleBar) Layout(gtx C) D {
 								return lbl(gtx, th, fontSans, 12, pal.TextDim, "Search resources, run commands…")
 							})
 						}),
-						layout.Rigid(func(gtx C) D { return keyChip(gtx, th, "Ctrl K") }),
+						layout.Rigid(func(gtx C) D { return keyChip(gtx, th, shortcutLabel("K")) }),
 					)
 				})
 			})
@@ -231,6 +239,9 @@ func (t *TitleBar) Layout(gtx C) D {
 		st.Pop()
 	}
 
+	if nativeWindowControls {
+		return D{Size: image.Pt(w, h)}
+	}
 	// window controls
 	st = op.Offset(image.Pt(w-ctrlW, 0)).Push(gtx.Ops)
 	cg := gtx

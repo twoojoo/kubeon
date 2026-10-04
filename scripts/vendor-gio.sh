@@ -7,6 +7,11 @@
 #  - allow dragging maximized windows (compositor restores them)
 #  - double-click on a move area toggles maximize
 #  - right-click on a move area opens the compositor window menu
+# Patches (macOS):
+#  - keep the native traffic lights visible on undecorated windows
+#  - double-click on a move area zooms the window
+# Patches (windows):
+#  - Direct3D 11: fall back to the WARP software rasterizer without a GPU
 set -euo pipefail
 
 GIO_VERSION="${GIO_VERSION:-v0.10.3}"

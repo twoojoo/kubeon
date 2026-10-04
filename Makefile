@@ -7,12 +7,15 @@
 # Set GIO_TAGS= (empty) once X11/Vulkan dev headers are installed:
 #   sudo apt install libx11-dev libx11-xcb-dev libxkbcommon-x11-dev libxcursor-dev libxfixes-dev libvulkan-dev
 GIO_TAGS ?= nox11,novulkan
-DEV_TAGS := $(GIO_TAGS),dev
+comma := ,
+DEV_TAGS := $(if $(GIO_TAGS),$(GIO_TAGS)$(comma))dev
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 
-.PHONY: build build-dev run test test-int dev-up dev-down vendor-k9s
+.PHONY: build build-dev run test test-int dev-up dev-down vendor-k9s \
+	icons package-linux package-windows package-macos
 
 build:
-	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w' -o kubeon ./cmd/kubeon
+	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w -X main.version=$(VERSION)' -o kubeon ./cmd/kubeon
 
 build-dev:
 	go build -tags '$(DEV_TAGS)' -o .dev/kubeon-dev ./cmd/kubeon
@@ -36,3 +39,21 @@ dev-down:
 
 vendor-k9s:
 	./scripts/vendor-k9s.sh && go mod tidy
+
+# ---- release packages (dist/) ----
+
+# regenerate packaging/icons from scripts/icongen
+icons:
+	go run ./scripts/icongen -out packaging/icons
+
+# AppImage, .deb, .rpm, .tar.gz (built in Docker, full Wayland+X11+Vulkan)
+package-linux:
+	VERSION=$(VERSION) ./scripts/package-linux.sh
+
+# portable zips for amd64 and arm64 (cross-compiled, no cgo)
+package-windows:
+	VERSION=$(VERSION) ./scripts/package-windows.sh
+
+# universal kubeon.app, .dmg and .zip (macOS host only)
+package-macos:
+	VERSION=$(VERSION) ./scripts/package-macos.sh

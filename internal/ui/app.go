@@ -100,6 +100,9 @@ type overlay interface {
 }
 
 // Run opens the main window and blocks until it is closed.
+// Version is the kubeon release, shown in the preferences.
+var Version = "dev"
+
 func Run(opts Options) error {
 	a := newApp(opts, new(app.Window))
 	a.w.Option(app.Title("kubeon"), app.Size(unit.Dp(1440), unit.Dp(900)), app.MinSize(unit.Dp(800), unit.Dp(500)),

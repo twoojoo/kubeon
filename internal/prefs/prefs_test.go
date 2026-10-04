@@ -3,6 +3,7 @@ package prefs
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -46,6 +47,9 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestMigrateLegacyDirs(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("XDG directories (and k9desk installs) only exist on Linux")
+	}
 	cfg, cache := t.TempDir(), t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	t.Setenv("XDG_CACHE_HOME", cache)

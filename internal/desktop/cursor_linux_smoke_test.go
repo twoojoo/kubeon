@@ -1,4 +1,4 @@
-//go:build smoke
+//go:build smoke && linux
 
 package desktop
 

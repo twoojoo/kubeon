@@ -1,4 +1,3 @@
-// Package desktop reads desktop-environment settings Gio doesn't know about.
 package desktop
 
 import (

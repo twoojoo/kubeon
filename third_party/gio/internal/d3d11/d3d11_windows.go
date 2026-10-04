@@ -634,6 +634,7 @@ var (
 const (
 	SDK_VERSION          = 7
 	DRIVER_TYPE_HARDWARE = 1
+	DRIVER_TYPE_WARP     = 5
 
 	DXGI_FORMAT_UNKNOWN             = 0
 	DXGI_FORMAT_R16_FLOAT           = 54

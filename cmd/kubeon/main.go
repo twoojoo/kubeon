@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/giovanni/kubeon/internal/desktop"
 	"github.com/giovanni/kubeon/internal/prefs"
@@ -14,15 +16,34 @@ import (
 	"github.com/giovanni/kubeon/internal/ui"
 )
 
+// version is set at build time (-ldflags "-X main.version=…").
+var version = "dev"
+
 func main() {
+	attachConsole()
 	var (
 		kubeconfig = flag.String("kubeconfig", "", "path to kubeconfig (default: $KUBECONFIG or ~/.kube/config)")
 		kctx       = flag.String("context", "", "kube context to open (default: current-context)")
 		ns         = flag.String("namespace", "", "initial namespace (default: all)")
 		resource   = flag.String("resource", "", "initial resource gvr or alias, e.g. v1/pods")
 		logLevel   = flag.String("log-level", "warn", "debug|info|warn|error")
+		showVer    = flag.Bool("version", false, "print the version and exit")
 	)
+	// old macOS launchers pass a process serial number (-psn_0_12345)
+	os.Args = slices.DeleteFunc(os.Args, func(a string) bool { return strings.HasPrefix(a, "-psn_") })
 	flag.Parse()
+	if *showVer {
+		fmt.Println("kubeon", version)
+		return
+	}
+	ui.Version = version
+
+	// desktop launchers start apps with a minimal environment; release
+	// builds load the login shell's (PATH for exec auth plugins, KUBECONFIG).
+	// Dev builds never do: they must not see the user's kube settings.
+	if !safety.Dev {
+		desktop.ImportShellEnv()
+	}
 
 	prefs.MigrateLegacyDirs()
 	if err := setupLog(*logLevel); err != nil {
