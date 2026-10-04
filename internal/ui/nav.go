@@ -15,7 +15,7 @@ func (a *App) current() navState {
 	switch a.page {
 	case xrayPage:
 		st.gvr, st.path = a.xray.gvr, a.xray.focus
-	case overviewGVR, sanitizerPage:
+	case overviewGVR, sanitizerPage, rbacPage:
 	default:
 		st.gvr, st.path, st.selID = a.view.gvr, a.view.path, a.view.selID
 	}
@@ -41,6 +41,13 @@ func (a *App) show(st navState) {
 		a.view.gvr = ""
 		a.ovw.close()
 		a.xray.open(st.gvr, a.ns, st.path)
+	case rbacPage:
+		a.view.close()
+		a.view.gvr = ""
+		a.ovw.close()
+		a.xray.close()
+		a.rbac.open(a.ns)
+		a.sidebar.active = rbacPage
 	case sanitizerPage:
 		a.view.close()
 		a.view.gvr = ""

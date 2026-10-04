@@ -156,10 +156,11 @@ var gvrIcons = map[string]*widget.Icon{
 	"rbac.authorization.k8s.io/v1/clusterroles":         icRole,
 	"rbac.authorization.k8s.io/v1/clusterrolebindings":  icBinding,
 	"apiextensions.k8s.io/v1/customresourcedefinitions": icCRD,
-	"helm":         icHelm,
-	"sanitizer":    icBug,
-	"helm-history": icHistory,
-	"containers":   icTerminal,
+	"helm":          icHelm,
+	"sanitizer":     icBug,
+	"rbac-explorer": icAccess,
+	"helm-history":  icHistory,
+	"containers":    icTerminal,
 }
 
 // kindIcons maps xray node kinds (resource plurals) to icons.

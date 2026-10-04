@@ -244,3 +244,5 @@ func rect(x0, y0, x1, y1 int) image.Rectangle { return image.Rect(x0, y0, x1, y1
 type colorNRGBA = color.NRGBA
 
 type fontT = font.Font
+
+func unitDp(v int) unit.Dp { return unit.Dp(v) }

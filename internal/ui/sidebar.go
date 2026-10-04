@@ -65,6 +65,7 @@ var sections = []navSection{
 		{"Releases", "helm"},
 	}},
 	{"Access Control", []navItem{
+		{"RBAC Explorer", "rbac-explorer"},
 		{"Service Accounts", "v1/serviceaccounts"},
 		{"Roles", "rbac.authorization.k8s.io/v1/roles"},
 		{"Role Bindings", "rbac.authorization.k8s.io/v1/rolebindings"},
