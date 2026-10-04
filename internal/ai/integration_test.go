@@ -49,6 +49,7 @@ func TestToolsDirect(t *testing.T) {
 		{"get_logs", `{"kind":"deploy","name":"jsonlog","tail_lines":5}`, "request handled"},
 		{"xray", `{"kind":"deploy","name":"web"}`, "container"},
 		{"list_api_resources", `{}`, "Widget"},
+		{"lint_cluster", `{}`, "POD-FAILING"},
 	} {
 		out, err := tl.Run(ctx, ToolCall{Name: tc.name, Args: []byte(tc.args)})
 		if err != nil {

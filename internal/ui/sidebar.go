@@ -26,6 +26,7 @@ type navSection struct {
 var sections = []navSection{
 	{"Cluster", []navItem{
 		{"Overview", overviewGVR},
+		{"Sanitizer", "sanitizer"},
 		{"Nodes", "v1/nodes"},
 		{"Namespaces", "v1/namespaces"},
 		{"Events", "events.k8s.io/v1/events"},

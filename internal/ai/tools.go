@@ -87,6 +87,8 @@ func (t *Tools) Specs() []ToolSpec {
 		mk("xray", "Dependency tree of a workload (deployment → replicasets → pods → containers, service accounts, config maps, secrets, PVCs) with health status.",
 			map[string]any{"kind": strProp("deployments, statefulsets, daemonsets, replicasets, services or pods"), "name": strProp("Optional resource name to focus on"), "namespace": strProp(nsDesc)},
 			"kind"),
+		mk("lint_cluster", "Run the k9desk sanitizer (Popeye-like checks): failing/pending pods, missing requests/limits/probes, floating image tags, privileged containers, unavailable deployments, services without endpoints, broken references, unused config, unbound PVCs, node problems.",
+			map[string]any{"namespace": strProp(nsDesc), "min_severity": map[string]any{"type": "string", "enum": []string{"error", "warning", "info"}, "description": "Lowest severity to include (default warning)"}}),
 		mk("list_api_resources", "List resource kinds available in the cluster (including CRDs).", map[string]any{}),
 		mk("propose_action", "Propose a change for the user to review and confirm. NEVER assume it was executed: the user decides. Use for scale, restart, delete, apply (full manifest), cordon, uncordon.",
 			map[string]any{
@@ -277,6 +279,29 @@ func (t *Tools) Run(ctx context.Context, call ToolCall) (string, error) {
 		}
 		var b strings.Builder
 		dumpX(&b, root, 0)
+		return clip(b.String()), nil
+
+	case "lint_cluster":
+		var la struct {
+			MinSeverity string `json:"min_severity"`
+		}
+		_ = json.Unmarshal(call.Args, &la)
+		r := c.Lint(t.ns(a.Namespace))
+		var b strings.Builder
+		fmt.Fprintf(&b, "score %d%% (grade %s)\n", r.Score, r.Grade())
+		for _, cs := range r.Categories {
+			if cs.Scanned > 0 {
+				fmt.Fprintf(&b, "%s: %d%% clean of %d (%dE %dW %dI)\n", cs.Name, cs.Percent(), cs.Scanned, cs.Errors, cs.Warns, cs.Infos)
+			}
+		}
+		b.WriteString("findings:\n")
+		for _, is := range r.Issues {
+			sev := map[backend.Severity]string{backend.SevErr: "ERROR", backend.SevWarn: "WARN", backend.SevInfo: "INFO"}[is.Severity]
+			if sev == "INFO" && la.MinSeverity != "info" || sev == "WARN" && la.MinSeverity == "error" {
+				continue
+			}
+			fmt.Fprintf(&b, "%s %s %s: %s\n", sev, is.Rule, is.Path, is.Message)
+		}
 		return clip(b.String()), nil
 
 	case "list_api_resources":

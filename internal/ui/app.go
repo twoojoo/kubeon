@@ -71,6 +71,7 @@ type App struct {
 	view                   *ResourceView
 	ovw                    *OverviewView
 	xray                   *XRayView
+	san                    *SanitizerView
 	page                   string // current gvr, overviewGVR or xrayPage
 	navStack               []navState
 	drawer                 *Drawer
@@ -122,6 +123,7 @@ func newApp(opts Options, w *app.Window) *App {
 	a.view = newResourceView(&a)
 	a.ovw = newOverview(&a)
 	a.xray = newXRay(&a)
+	a.san = newSanitizer(&a)
 	a.drawer = newDrawer(&a)
 	a.dock = newDock(&a)
 	return &a
@@ -437,6 +439,15 @@ func (a *App) layoutMain(gtx C) D {
 			switch a.page {
 			case overviewGVR:
 				return a.ovw.Layout(gtx)
+			case sanitizerPage:
+				if a.drawer.open {
+					return layout.Flex{}.Layout(gtx,
+						layout.Flexed(0.55, a.san.Layout),
+						layout.Rigid(func(gtx C) D { return vline(gtx, pal.Border) }),
+						layout.Flexed(0.45, a.drawer.Layout),
+					)
+				}
+				return a.san.Layout(gtx)
 			case xrayPage:
 				if a.drawer.open {
 					return layout.Flex{}.Layout(gtx,
@@ -644,6 +655,8 @@ func (a *App) pageTitleSafe() string {
 	switch a.page {
 	case overviewGVR:
 		return "Cluster overview"
+	case sanitizerPage:
+		return "Sanitizer"
 	case xrayPage:
 		return "XRay of " + titleFor(a.xray.gvr)
 	case "":
