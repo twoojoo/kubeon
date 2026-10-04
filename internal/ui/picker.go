@@ -239,6 +239,24 @@ type Confirm struct {
 	onOK       func(opts []bool)
 	done       bool
 	ok, cancel widget.Clickable
+
+	// protected contexts: the user must type typeName to enable OK
+	typeName string
+	prodCtx  string
+	typed    widget.Editor
+	focused  bool
+}
+
+func (c *Confirm) armed() bool {
+	return c.typeName == "" || strings.TrimSpace(c.typed.Text()) == c.typeName
+}
+
+func (c *Confirm) accept() {
+	if !c.armed() {
+		return
+	}
+	c.done = true
+	c.onOK(c.opts)
 }
 
 // newConfirm: danger dialogs offer a single "force" option.
@@ -267,13 +285,27 @@ func (c *Confirm) Layout(gtx C) D {
 			break
 		}
 		if e, ok := ev.(key.Event); ok && e.State == key.Press {
-			c.done = true
-			c.onOK(c.opts)
+			c.accept()
+		}
+	}
+	if c.typeName != "" {
+		if !c.focused {
+			c.typed.SingleLine, c.typed.Submit = true, true
+			gtx.Execute(key.FocusCmd{Tag: &c.typed})
+			c.focused = true
+		}
+		for {
+			ev, ok := c.typed.Update(gtx)
+			if !ok {
+				break
+			}
+			if _, ok := ev.(widget.SubmitEvent); ok {
+				c.accept()
+			}
 		}
 	}
 	if c.ok.Clicked(gtx) {
-		c.done = true
-		c.onOK(c.opts)
+		c.accept()
 	}
 	if c.cancel.Clicked(gtx) {
 		c.done = true
@@ -312,6 +344,44 @@ func (c *Confirm) Layout(gtx C) D {
 							return l.Layout(gtx)
 						}),
 						layout.Rigid(func(gtx C) D {
+							if c.typeName == "" {
+								return D{}
+							}
+							return layout.Inset{Top: 12}.Layout(gtx, func(gtx C) D {
+								return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+									layout.Rigid(func(gtx C) D {
+										return rbg(gtx, withAlpha(pal.Err, 0x22), 6, func(gtx C) D {
+											gtx.Constraints.Min.X = gtx.Constraints.Max.X
+											return insetHV(9, 6).Layout(gtx, func(gtx C) D {
+												return iconText(gtx, th, icWarning, 12, pal.Err, "Protected context: "+c.prodCtx)
+											})
+										})
+									}),
+									layout.Rigid(layout.Spacer{Height: 10}.Layout),
+									layout.Rigid(func(gtx C) D {
+										return lbl(gtx, th, fontSans, 12, pal.Text, "Type "+c.typeName+" to confirm")
+									}),
+									layout.Rigid(layout.Spacer{Height: 4}.Layout),
+									layout.Rigid(func(gtx C) D {
+										b := pal.Border
+										if c.armed() {
+											b = pal.Ok
+										} else if gtx.Focused(&c.typed) {
+											b = pal.Err
+										}
+										return rborder(gtx, b, pal.Bg, 6, func(gtx C) D {
+											gtx.Constraints.Min.X = gtx.Constraints.Max.X
+											return insetHV(8, 6).Layout(gtx, func(gtx C) D {
+												e := material.Editor(th, &c.typed, c.typeName)
+												e.Font, e.TextSize, e.Color, e.HintColor = fontMono, 13, pal.TextBright, withAlpha(pal.TextDim, 0x80)
+												return e.Layout(gtx)
+											})
+										})
+									}),
+								)
+							})
+						}),
+						layout.Rigid(func(gtx C) D {
 							if len(c.optLabels) == 0 {
 								return D{}
 							}
@@ -336,6 +406,9 @@ func (c *Confirm) Layout(gtx C) D {
 									col := pal.Accent
 									if c.danger {
 										col = pal.Err
+									}
+									if !c.armed() {
+										col = pal.Border
 									}
 									return button(gtx, th, &c.ok, c.title, col)
 								}),

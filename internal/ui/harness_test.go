@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/gpu/headless"
 	"gioui.org/io/event"
 	"gioui.org/io/input"
@@ -232,4 +233,12 @@ func TestUIOverviewAndStress(t *testing.T) {
 	el := time.Since(start)
 	t.Logf("%d rows: %d frames in %v (%.1f ms/frame incl. GPU readback-free render)", n, frames, el, float64(el.Milliseconds())/float64(frames))
 	h.shot("11-configmaps")
+}
+
+func f32pt(x, y float32) f32.Point { return f32.Pt(x, y) }
+
+// gtxForTest returns a context usable for direct widget calls.
+func (h *harness) gtxForTest() layout.Context {
+	h.ops.Reset()
+	return layout.Context{Ops: &h.ops, Now: time.Now(), Metric: unit.Metric{PxPerDp: 1, PxPerSp: 1}, Constraints: layout.Exact(h.size), Source: h.r.Source()}
 }

@@ -18,6 +18,8 @@ import (
 // PortForward is an active local → pod port tunnel.
 type PortForward struct {
 	ID     string
+	GVR    string // requested resource (pod, service, deployment…)
+	Target string // requested path (ns/name)
 	Pod    string
 	Local  int
 	Remote int
@@ -146,6 +148,8 @@ func (c *Cluster) PortForward(gvr, path string, local, remote int) (*PortForward
 	}
 	p := PortForward{
 		ID:     fmt.Sprintf("%s:%d:%d", pod, ports[0].Local, remote),
+		GVR:    gvr,
+		Target: path,
 		Pod:    pod,
 		Local:  int(ports[0].Local),
 		Remote: remote,

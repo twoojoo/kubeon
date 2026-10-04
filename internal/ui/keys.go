@@ -12,6 +12,10 @@ func (a *App) handleKeys(gtx C) {
 		key.Filter{Name: key.NameEscape},
 		key.Filter{Name: "K", Required: key.ModShortcut},
 		key.Filter{Name: "P", Required: key.ModShortcut, Optional: key.ModShift},
+		key.Filter{Name: "T", Required: key.ModShortcut},
+		key.Filter{Name: "W", Required: key.ModShortcut},
+		key.Filter{Name: key.NameTab, Required: key.ModShortcut, Optional: key.ModShift},
+		key.Filter{Name: ",", Required: key.ModShortcut},
 	}
 	nav := a.cluster != nil && !a.textFocused(gtx)
 	if nav {
@@ -33,6 +37,8 @@ func (a *App) handleKeys(gtx C) {
 			key.Filter{Name: "V"}, key.Filter{Name: "B"}, key.Filter{Name: "A"},
 			key.Filter{Name: key.NameLeftArrow}, key.Filter{Name: key.NameRightArrow},
 			key.Filter{Name: key.NameSpace},
+			key.Filter{Name: "A", Required: key.ModShortcut},
+			key.Filter{Name: "M"},
 			key.Filter{Name: "D", Required: key.ModCtrl},
 			key.Filter{Name: "K", Required: key.ModCtrl},
 			key.Filter{Name: "R", Required: key.ModCtrl},
@@ -61,6 +67,18 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 	case e.Modifiers.Contain(key.ModShortcut) && e.Name == "K",
 		e.Modifiers.Contain(key.ModShortcut) && e.Name == "P":
 		a.openPalette("")
+	case e.Modifiers.Contain(key.ModShortcut) && e.Name == "T":
+		a.newTab()
+	case e.Modifiers.Contain(key.ModShortcut) && e.Name == "W":
+		a.closeTab(a.tabIdx)
+	case e.Modifiers.Contain(key.ModShortcut) && e.Name == key.NameTab:
+		if e.Modifiers.Contain(key.ModShift) {
+			a.cycleTab(-1)
+		} else {
+			a.cycleTab(1)
+		}
+	case e.Modifiers.Contain(key.ModShortcut) && e.Name == ",":
+		a.overlay = newPrefsPanel(a)
 	case !nav:
 		return
 	case a.page == xrayPage && e.Name != ":" && e.Name != ";" && e.Name != "N" && e.Name != "0" && e.Name != "A":
@@ -87,8 +105,17 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 		v.move(1 << 30)
 	case e.Name == key.NameReturn || e.Name == key.NameEnter:
 		v.enter()
+	case e.Name == "M":
+		a.bookmarkCurrent()
+	case e.Name == "A" && e.Modifiers.Contain(key.ModShortcut):
+		v.markAll()
+	case e.Name == key.NameSpace:
+		if r, ok := v.selected(); ok {
+			v.toggleMark(r.ID)
+			v.move(1)
+		}
 	case e.Name == "D" && ctrl:
-		v.confirmDelete()
+		v.bulkDelete()
 	case e.Name == "K" && ctrl:
 		v.confirmDelete()
 	case e.Name == "R" && ctrl:
@@ -112,7 +139,7 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 	case e.Name == "R" && v.gvr == "v1/nodes":
 		v.drain()
 	case e.Name == "R":
-		v.restart()
+		v.bulkRestart()
 	case e.Name == "F":
 		v.portForward()
 	case e.Name == "X":
@@ -147,6 +174,8 @@ func (a *App) escape(gtx C) {
 		gtx.Execute(key.FocusCmd{})
 	case a.textFocused(gtx):
 		gtx.Execute(key.FocusCmd{})
+	case a.page != xrayPage && len(a.view.marked) > 0:
+		a.view.clearMarks()
 	case a.drawer.open:
 		a.drawer.close()
 	case a.page != xrayPage && a.view.filter.Len() > 0:

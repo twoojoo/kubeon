@@ -24,6 +24,7 @@ type TitleBar struct {
 	app                      *App
 	minBtn, maxBtn, closeBtn widget.Clickable
 	nsBtn, searchBtn, aiBtn  widget.Clickable
+	themeBtn, prefsBtn       widget.Clickable
 }
 
 func newTitleBar(a *App) *TitleBar { return &TitleBar{app: a} }
@@ -49,6 +50,12 @@ func (t *TitleBar) Layout(gtx C) D {
 	}
 	if t.closeBtn.Clicked(gtx) {
 		t.perform(system.ActionClose)
+	}
+	if t.prefsBtn.Clicked(gtx) {
+		a.overlay = newPrefsPanel(a)
+	}
+	if t.themeBtn.Clicked(gtx) {
+		a.toggleTheme()
 	}
 	if t.aiBtn.Clicked(gtx) {
 		a.ai.toggle(gtx)
@@ -125,30 +132,49 @@ func (t *TitleBar) Layout(gtx C) D {
 	} else {
 		moveRect(image.Rect(0, 0, sx, h))
 	}
-	// assistant toggle, left of the window controls
+	// theme toggle + assistant, left of the window controls
 	var aiCall op.CallOp
 	var aiDims D
-	if a.cluster != nil {
+	{
 		m := op.Record(gtx.Ops)
 		ag := gtx
-		ag.Constraints = layout.Constraints{Max: image.Pt(gtx.Dp(160), h)}
-		aiDims = t.aiBtn.Layout(ag, func(gtx C) D {
-			b, c := colorNRGBA{}, pal.Text
-			switch {
-			case a.ai.open:
-				b, c = withAlpha(pal.Accent, 0x40), pal.TextBright
-			case t.aiBtn.Hovered():
-				b = pal.Hover
-			}
-			return rbg(gtx, b, 6, func(gtx C) D {
-				return insetHV(9, 5).Layout(gtx, func(gtx C) D {
-					return iconText(gtx, th, icAI, 12, c, "Assistant")
-				})
-			})
-		})
+		ag.Constraints = layout.Constraints{Max: image.Pt(gtx.Dp(220), h)}
+		aiDims = layout.Flex{Alignment: layout.Middle}.Layout(ag,
+			layout.Rigid(func(gtx C) D {
+				return layout.Inset{Right: 2}.Layout(gtx, func(gtx C) D { return iconOnly(gtx, &t.prefsBtn, icSettings, 16) })
+			}),
+			layout.Rigid(func(gtx C) D {
+				ic := icMoon
+				if pal.Light {
+					ic = icSun
+				}
+				return layout.Inset{Right: 4}.Layout(gtx, func(gtx C) D { return iconOnly(gtx, &t.themeBtn, ic, 16) })
+			}),
+			layout.Rigid(func(gtx C) D {
+				if a.cluster == nil {
+					return D{}
+				}
+				return t.aiButton(gtx)
+			}),
+		)
 		aiCall = m.Stop()
 	}
+
 	aiX := w - ctrlW - gtx.Dp(8) - aiDims.Size.X
+	// policy badges, right-aligned before the toolbar buttons
+	{
+		m := op.Record(gtx.Ops)
+		bg := gtx
+		bg.Constraints = layout.Constraints{Max: image.Pt(gtx.Dp(260), h)}
+		bd := a.policyBadges(bg)
+		call := m.Stop()
+		if bd.Size.X > 0 {
+			x := max(sx+bw+gtx.Dp(8), aiX-bd.Size.X-gtx.Dp(12))
+			st := op.Offset(image.Pt(x, (h-bd.Size.Y)/2)).Push(gtx.Ops)
+			call.Add(gtx.Ops)
+			st.Pop()
+		}
+	}
 	moveRect(image.Rect(sx+bw, 0, aiX, h))
 	if aiDims.Size.X > 0 {
 		moveRect(image.Rect(aiX+aiDims.Size.X, 0, w-ctrlW, h))
@@ -253,7 +279,7 @@ func (t *TitleBar) logo(gtx C) D {
 		p.MoveTo(f32.Pt(c.X-d.X*R, c.Y-d.Y*R))
 		p.LineTo(f32.Pt(c.X+d.X*R, c.Y+d.Y*R))
 	}
-	paint.FillShape(gtx.Ops, pal.TextBright, clip.Stroke{Path: p.End(), Width: float32(gtx.Dp(1.8))}.Op())
+	paint.FillShape(gtx.Ops, pal.OnAccent, clip.Stroke{Path: p.End(), Width: float32(gtx.Dp(1.8))}.Op())
 	return D{Size: image.Pt(s, s)}
 }
 
@@ -277,7 +303,7 @@ func (t *TitleBar) winButton(gtx C, cl *widget.Clickable, g winGlyph, danger boo
 		if cl.Hovered() {
 			if danger {
 				fillRect(gtx, rgb(0xd83b3b), image.Rect(0, 0, w, h-gtx.Dp(1)))
-				c = pal.TextBright
+				c = pal.OnAccent
 			} else {
 				fillRect(gtx, pal.Hover, image.Rect(0, 0, w, h-gtx.Dp(1)))
 				c = pal.TextBright
@@ -317,5 +343,23 @@ func (t *TitleBar) winButton(gtx C, cl *widget.Clickable, g winGlyph, danger boo
 		}
 		paint.FillShape(gtx.Ops, c, clip.Stroke{Path: p.End(), Width: sw}.Op())
 		return D{Size: image.Pt(w, h)}
+	})
+}
+
+func (t *TitleBar) aiButton(gtx C) D {
+	a, th := t.app, t.app.th
+	return t.aiBtn.Layout(gtx, func(gtx C) D {
+		b, c := colorNRGBA{}, pal.Text
+		switch {
+		case a.ai.open:
+			b, c = withAlpha(pal.Accent, 0x40), pal.TextBright
+		case t.aiBtn.Hovered():
+			b = pal.Hover
+		}
+		return rbg(gtx, b, 6, func(gtx C) D {
+			return insetHV(9, 5).Layout(gtx, func(gtx C) D {
+				return iconText(gtx, th, icAI, 12, c, "Assistant")
+			})
+		})
 	})
 }

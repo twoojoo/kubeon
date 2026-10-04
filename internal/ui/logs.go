@@ -401,7 +401,7 @@ func (l *LogView) Layout(gtx C) D {
 			})
 		}),
 		layout.Flexed(1, func(gtx C) D {
-			fill(gtx, rgb(0x16191b))
+			fill(gtx, pal.CodeBg)
 			return layout.Inset{Left: 8, Right: 4}.Layout(gtx, func(gtx C) D {
 				return material.List(th, &l.list).Layout(gtx, l.count(), func(gtx C, i int) D {
 					return l.layoutLine(gtx, l.at(i))
@@ -506,6 +506,7 @@ func podTag(pod string) string {
 }
 
 var containerPalette = []uint32{0x5fb3e8, 0xc792ea, 0x89ddff, 0xffcb6b, 0xc3e88d, 0xf78c6c}
+var containerPaletteLight = []uint32{0x1f6fb2, 0x8a3fc4, 0x0b7a8a, 0xa86a00, 0x3d7a1c, 0xc24a1f}
 
 func containerColor(name string) colorNRGBA {
 	h := 0
@@ -514,6 +515,9 @@ func containerColor(name string) colorNRGBA {
 	}
 	if h < 0 {
 		h = -h
+	}
+	if pal.Light {
+		return rgb(containerPaletteLight[h%len(containerPaletteLight)])
 	}
 	return rgb(containerPalette[h%len(containerPalette)])
 }

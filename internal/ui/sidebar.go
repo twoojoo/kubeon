@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/giovanni/k9desk/internal/prefs"
 	"image"
 	"sort"
 
@@ -77,6 +78,7 @@ type sideRow struct {
 	section string
 	group   bool // CRD group header
 	item    navItem
+	bm      *prefs.Bookmark
 }
 
 // Sidebar is the left navigation tree.
@@ -122,6 +124,16 @@ func (s *Sidebar) reload(c *backend.Cluster) {
 
 func (s *Sidebar) rows() []sideRow {
 	var rr []sideRow
+	if c := s.app.cluster; c != nil {
+		if bms := s.app.prefs.BookmarksFor(c.Context); len(bms) > 0 {
+			rr = append(rr, sideRow{header: true, section: "Bookmarks"})
+			if !s.collapsed["Bookmarks"] {
+				for i := range bms {
+					rr = append(rr, sideRow{section: "Bookmarks", bm: &bms[i]})
+				}
+			}
+		}
+	}
 	for _, sec := range sections {
 		rr = append(rr, sideRow{header: true, section: sec.title})
 		if s.collapsed[sec.title] {
@@ -227,6 +239,9 @@ func (s *Sidebar) layoutCluster(gtx C) D {
 
 func (s *Sidebar) layoutRow(gtx C, r sideRow) D {
 	th := s.app.th
+	if r.bm != nil {
+		return s.layoutBookmark(gtx, r.bm)
+	}
 	switch {
 	case r.header:
 		cl := s.click("sec:" + r.section)
@@ -331,4 +346,40 @@ func chevronIcon(collapsed bool) *widget.Icon {
 		return icCollapse
 	}
 	return icExpand
+}
+
+func (s *Sidebar) layoutBookmark(gtx C, b *prefs.Bookmark) D {
+	th := s.app.th
+	bm := *b
+	cl := s.click("bm:" + b.Name)
+	if cl.Clicked(gtx) {
+		s.app.openBookmark(bm)
+	}
+	return cl.Layout(gtx, func(gtx C) D {
+		active := s.active == "bm:"+b.Name
+		h := gtx.Dp(28)
+		sz := image.Pt(gtx.Constraints.Max.X, h)
+		m := gtx.Dp(6)
+		pillR := image.Rect(m, gtx.Dp(1), sz.X-m, h-gtx.Dp(1))
+		switch {
+		case active:
+			fillRRect(gtx, pal.Selected, pillR, gtx.Dp(5))
+		case cl.Hovered():
+			fillRRect(gtx, pal.Hover, pillR, gtx.Dp(5))
+		}
+		gtx.Constraints = layout.Exact(sz)
+		return layout.Inset{Left: 30, Right: 8}.Layout(gtx, func(gtx C) D {
+			return layout.W.Layout(gtx, func(gtx C) D {
+				c := pal.Text
+				if active {
+					c = pal.TextBright
+				}
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx C) D { return mdi(gtx, icBookmark, pal.Accent, 15) }),
+					layout.Rigid(layout.Spacer{Width: 9}.Layout),
+					layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 13, c, bm.Name) }),
+				)
+			})
+		})
+	})
 }

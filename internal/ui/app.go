@@ -22,6 +22,7 @@ import (
 
 	"github.com/giovanni/k9desk/internal/backend"
 	"github.com/giovanni/k9desk/internal/notify"
+	"github.com/giovanni/k9desk/internal/prefs"
 	"github.com/giovanni/k9desk/internal/safety"
 )
 
@@ -57,8 +58,15 @@ type App struct {
 	sidebar *Sidebar
 	title   *TitleBar
 	ai      *AIPanel
+	prefs   *prefs.Prefs
 
 	maximized, winFocused  bool
+	rootTag                int
+	pointer                image.Point
+	pendingCopy            *string
+	tabs                   []*tabState
+	tabIdx                 int
+	newTabBtn              widget.Clickable
 	backdropTag, dialogTag int
 	view                   *ResourceView
 	ovw                    *OverviewView
@@ -103,7 +111,8 @@ func Run(opts Options) error {
 }
 
 func newApp(opts Options, w *app.Window) *App {
-	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true}
+	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load()}
+	setTheme(a.th, a.prefs.Theme)
 	if w != nil {
 		a.notifier = notify.New("k9desk")
 	}
@@ -251,6 +260,8 @@ func (a *App) connect(kctx string) {
 			}
 			a.cluster, a.namespaces = c, nss
 			a.ai.reset()
+			a.tabs, a.tabIdx = nil, 0
+			a.startSavedForwards(c)
 			a.events, a.unread = nil, 0
 			a.startHealth(c)
 			a.sidebar.reload(c)
@@ -305,6 +316,25 @@ func (a *App) layout(gtx C) {
 		gtx.Execute(key.FocusCmd{})
 	}
 	a.handleKeys(gtx)
+	if a.pendingCopy != nil {
+		copyText(gtx, *a.pendingCopy)
+		a.flash("Copied to clipboard", false)
+		a.pendingCopy = nil
+	}
+
+	// root handler: tracks the pointer in window coordinates (context menus)
+	root := clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops)
+	event.Op(gtx.Ops, &a.rootTag)
+	for {
+		ev, ok := gtx.Event(pointer.Filter{Target: &a.rootTag, Kinds: pointer.Move | pointer.Press | pointer.Drag})
+		if !ok {
+			break
+		}
+		if pe, ok := ev.(pointer.Event); ok {
+			a.pointer = pe.Position.Round()
+		}
+	}
+	defer root.Pop()
 
 	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(a.title.Layout),
@@ -327,6 +357,7 @@ func (a *App) layout(gtx C) {
 		layout.Rigid(a.layoutStatus),
 	)
 
+	a.layoutPolicyFrame(gtx)
 	if a.overlay != nil {
 		a.layoutModal(gtx)
 	}
@@ -345,10 +376,23 @@ func (a *App) layoutModal(gtx C) {
 	dg := gtx
 	dg.Constraints.Min = image.Point{}
 	dg.Constraints.Max.Y = max(0, size.Y-top)
+	anchored, isMenu := ov.(interface{ anchor() image.Point })
+	if isMenu {
+		dg.Constraints.Max.Y = size.Y
+	}
 	dims := ov.Layout(dg)
 	content := m.Stop()
 	x := (size.X - dims.Size.X) / 2
 	box := image.Rectangle{Min: image.Pt(x, top), Max: image.Pt(x+dims.Size.X, top+dims.Size.Y)}
+	if isMenu {
+		// popup at the pointer, kept inside the window
+		p := anchored.anchor()
+		p.X = max(0, min(p.X, size.X-dims.Size.X-gtx.Dp(4)))
+		if p.Y+dims.Size.Y > size.Y {
+			p.Y = max(0, p.Y-dims.Size.Y)
+		}
+		box = image.Rectangle{Min: p, Max: p.Add(dims.Size)}
+	}
 
 	// backdrop: dims the app, swallows input, dismisses on press
 	backdrop := clip.Rect{Max: size}.Push(gtx.Ops)
@@ -363,7 +407,9 @@ func (a *App) layoutModal(gtx C) {
 			gtx.Execute(key.FocusCmd{})
 		}
 	}
-	fill(gtx, withAlpha(rgb(0x000000), 0x90))
+	if !isMenu {
+		fill(gtx, pal.Backdrop)
+	}
 	backdrop.Pop()
 
 	// dialog: a blocker under its content keeps clicks on padding/labels
@@ -386,6 +432,7 @@ func (a *App) layoutMain(gtx C) D {
 		return a.layoutWelcome(gtx)
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(a.layoutTabs),
 		layout.Flexed(1, func(gtx C) D {
 			switch a.page {
 			case overviewGVR:
@@ -470,7 +517,7 @@ func (a *App) layoutStatus(gtx C) D {
 	gtx.Constraints.Min.Y, gtx.Constraints.Max.Y = h, h
 	fill(gtx, pal.Accent)
 	th := a.th
-	fg := pal.TextBright
+	fg := pal.OnAccent
 	center := func(w layout.Widget) layout.Widget {
 		return func(gtx C) D {
 			gtx.Constraints.Min.Y = h
@@ -478,7 +525,7 @@ func (a *App) layoutStatus(gtx C) D {
 		}
 	}
 	if a.pfBtn.Clicked(gtx) {
-		a.pickForward()
+		a.overlay = newPortForwardPanel(a)
 	}
 	if a.bellBtn.Clicked(gtx) {
 		a.overlay = newNotifPanel(a)
@@ -547,7 +594,7 @@ func (a *App) layoutStatus(gtx C) D {
 									return D{}
 								}
 								return layout.Inset{Left: 3}.Layout(gtx, func(gtx C) D {
-									return badge(gtx, th, itoa(a.unread), pal.TextBright, pal.Err)
+									return badge(gtx, th, itoa(a.unread), pal.OnAccent, pal.Err)
 								})
 							}),
 						)
@@ -575,12 +622,12 @@ func keyHint(gtx C, th *material.Theme, k, what string) D {
 		layout.Rigid(func(gtx C) D {
 			return rbg(gtx, withAlpha(rgb(0x000000), 0x40), 3, func(gtx C) D {
 				return insetHV(5, 1).Layout(gtx, func(gtx C) D {
-					return lbl(gtx, th, fontMono, 11, pal.TextBright, k)
+					return lbl(gtx, th, fontMono, 11, pal.OnAccent, k)
 				})
 			})
 		}),
 		layout.Rigid(layout.Spacer{Width: 4}.Layout),
-		layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, withAlpha(pal.TextBright, 0xd0), what) }),
+		layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, withAlpha(pal.OnAccent, 0xd0), what) }),
 	)
 }
 
@@ -603,4 +650,18 @@ func (a *App) pageTitleSafe() string {
 		return ""
 	}
 	return a.view.title
+}
+
+// toggleTheme switches dark/light and persists the choice.
+func (a *App) toggleTheme() {
+	if a.prefs.Theme == "light" {
+		a.prefs.Theme = "dark"
+	} else {
+		a.prefs.Theme = "light"
+	}
+	setTheme(a.th, a.prefs.Theme)
+	if err := a.prefs.Save(); err != nil {
+		a.flash("save preferences: "+err.Error(), true)
+	}
+	a.invalidate()
 }

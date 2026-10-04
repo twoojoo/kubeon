@@ -21,6 +21,10 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | Secrets | Decoded data tab, per-key reveal/copy, copy all as `.env`, download `.env` (mode 600) |
 | Helm | Releases, history (enter), values (user/computed), rollback, uninstall |
 | XRay | k9s dependency tree for deploy/sts/ds/rs/svc/pods as collapsible tree or pannable graph |
+| Safety | Per-context policies: **protected** (auto-detected for names like `prod`/`production`/`prd`/`live`) adds a red frame, a PRODUCTION badge and type-the-name confirmation for every change; **read-only** blocks edits, deletes, scaling, shells and assistant actions |
+| Selection | Ctrl+click, Shift+click, `space`, Ctrl+A; bulk delete/restart/cordon with one confirmation; right-click context menu with every action for the row (or the selection) |
+| Workspace | Tabs (Ctrl+T / Ctrl+W / Ctrl+Tab), bookmarks of resource+namespace+filter (`m`, sidebar section, `:bm`), port-forward manager with pinned forwards restored on connect and open-in-browser |
+| Appearance | Dark and light themes (title bar toggle, `:theme`), preferences panel (Ctrl+, or gear) |
 | Notifications | Health watcher (CrashLoop/ImagePull/OOM, node NotReady, deployment degraded/rollout complete) → desktop notifications via D-Bus + in-app bell |
 | Overview | Nodes, pods by status, deployments health, CPU/memory requests (+usage with metrics-server), warning events |
 | Keyboard | k9s style: `:` / Ctrl+K command palette (`po`, `deploy`, `ns demo`, `ctx …`, `pf`), `/` filter, `j/k`, `enter`, `l` logs, `p` previous logs, `s` shell, `d` describe, `y` yaml, `e` edit, `shift+f` port-forward, `r` restart (drain on nodes), `c`/`u` cordon/uncordon, `x` xray (decode on secrets), `v` helm values, `a` assistant, `b`/`esc` back, `ctrl+d` delete, `w` wide, `n` namespace, `0` all namespaces; palette: `xray deploy`, `helm`, `notify` |

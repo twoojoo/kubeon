@@ -227,7 +227,7 @@ func (t *Terminal) measure(gtx C) {
 
 func (t *Terminal) Layout(gtx C) D {
 	gtx.Constraints.Min = gtx.Constraints.Max
-	termBg := rgb(0x101214)
+	termBg := pal.TermBg
 	fill(gtx, termBg)
 	t.measure(gtx)
 
@@ -316,6 +316,11 @@ func (t *Terminal) Layout(gtx C) D {
 	return D{Size: size}
 }
 
+var ansi16Light = []uint32{
+	0x1d1f21, 0xc0392b, 0x2e7d32, 0x9a6700, 0x1f5fa8, 0x8e3fae, 0x0b7a8a, 0x5c6066,
+	0x6b6f75, 0xd84a3a, 0x3a8f3e, 0xb07c00, 0x2a73c7, 0xa04fc2, 0x138c9c, 0x2b2e33,
+}
+
 var ansi16 = []uint32{
 	0x1d1f21, 0xcc6666, 0xb5bd68, 0xf0c674, 0x81a2be, 0xb294bb, 0x8abeb7, 0xc5c8c6,
 	0x666666, 0xd54e53, 0xb9ca4a, 0xe7c547, 0x7aa6da, 0xc397d8, 0x70c0b1, 0xeaeaea,
@@ -326,6 +331,9 @@ func vtColor(c vt10x.Color, def colorNRGBA) colorNRGBA {
 	case c == vt10x.DefaultFG || c == vt10x.DefaultBG || c == vt10x.DefaultCursor:
 		return def
 	case c < 16:
+		if pal.Light {
+			return rgb(ansi16Light[c])
+		}
 		return rgb(ansi16[c])
 	case c < 232:
 		i := uint32(c) - 16

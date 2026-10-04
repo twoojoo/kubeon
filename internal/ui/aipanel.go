@@ -521,7 +521,7 @@ func (p *AIPanel) layoutTool(gtx C, it *chatItem) D {
 				out = out[:4000] + "\n…"
 			}
 			return layout.Inset{Top: 4}.Layout(gtx, func(gtx C) D {
-				return rbg(gtx, rgb(0x16191b), 6, func(gtx C) D {
+				return rbg(gtx, pal.CodeBg, 6, func(gtx C) D {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					return inset(8).Layout(gtx, func(gtx C) D {
 						l := material.Body2(th, out)
@@ -539,9 +539,9 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 	a := p.app
 	th := a.th
 	pr := it.prop
-	if it.approve.Clicked(gtx) && it.state == propPending {
+	if it.approve.Clicked(gtx) && it.state == propPending && a.allowMutation("Approve") {
 		danger := pr.Action == "delete" || pr.Action == "apply" || pr.Action == "cordon"
-		a.overlay = newConfirm(a, "Approve", proposalTitle(pr)+"?", danger, func(bool) { p.execute(it) })
+		a.overlay = a.guard(newConfirm(a, "Approve", proposalTitle(pr)+"?", danger, func(bool) { p.execute(it) }), pr.Path())
 	}
 	if it.reject.Clicked(gtx) && it.state == propPending {
 		it.state = propRejected
@@ -575,7 +575,7 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 						return D{}
 					}
 					return layout.Inset{Top: 6}.Layout(gtx, func(gtx C) D {
-						return rbg(gtx, rgb(0x16191b), 6, func(gtx C) D {
+						return rbg(gtx, pal.CodeBg, 6, func(gtx C) D {
 							gtx.Constraints.Min.X = gtx.Constraints.Max.X
 							return inset(8).Layout(gtx, func(gtx C) D {
 								l := material.Body2(th, pr.Manifest)

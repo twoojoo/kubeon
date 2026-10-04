@@ -23,13 +23,17 @@ type (
 	D = layout.Dimensions
 )
 
-// Palette is a Lens-like dark palette.
+// Palette holds the theme colors. pal is swapped at runtime by setTheme.
 type Palette struct {
 	Bg, Sidebar, Panel, Header, Border, Hover, Selected    color.NRGBA
 	Text, TextDim, TextBright, Accent, Ok, Warn, Err, Info color.NRGBA
+	OnAccent                                               color.NRGBA // text on accent/status-colored surfaces
+	CodeBg, TermBg                                         color.NRGBA
+	Backdrop                                               color.NRGBA // modal dimming
+	Light                                                  bool
 }
 
-var pal = Palette{
+var darkPal = Palette{
 	Bg:         rgb(0x1e2124),
 	Sidebar:    rgb(0x252a2e),
 	Panel:      rgb(0x2b3035),
@@ -45,6 +49,55 @@ var pal = Palette{
 	Warn:       rgb(0xff9800),
 	Err:        rgb(0xe85555),
 	Info:       rgb(0x5fb3e8),
+	OnAccent:   rgb(0xffffff),
+	CodeBg:     rgb(0x16191b),
+	TermBg:     rgb(0x101214),
+	Backdrop:   color.NRGBA{A: 0x90},
+}
+
+var lightPal = Palette{
+	Bg:         rgb(0xf6f7f9),
+	Sidebar:    rgb(0xeceff2),
+	Panel:      rgb(0xffffff),
+	Header:     rgb(0xf1f3f6),
+	Border:     rgb(0xd5dae0),
+	Hover:      rgb(0xe3e7ec),
+	Selected:   rgb(0xd3e5f6),
+	Text:       rgb(0x39404a),
+	TextDim:    rgb(0x77808b),
+	TextBright: rgb(0x111519),
+	Accent:     rgb(0x2b7bbd),
+	Ok:         rgb(0x2a9446),
+	Warn:       rgb(0xc96f00),
+	Err:        rgb(0xd03c3c),
+	Info:       rgb(0x1f7fc4),
+	OnAccent:   rgb(0xffffff),
+	CodeBg:     rgb(0xeff1f4),
+	TermBg:     rgb(0xfbfbfc),
+	Backdrop:   color.NRGBA{R: 0x20, G: 0x26, B: 0x2e, A: 0x55},
+	Light:      true,
+}
+
+var pal = darkPal
+
+// setTheme switches the palette ("dark" | "light").
+func setTheme(th *material.Theme, name string) {
+	pal = darkPal
+	if name == "light" {
+		pal = lightPal
+	}
+	if th != nil {
+		th.Palette = material.Palette{Bg: pal.Bg, Fg: pal.Text, ContrastBg: pal.Accent, ContrastFg: pal.OnAccent}
+	}
+}
+
+// onColor picks readable text for a filled surface.
+func onColor(bg, fallback color.NRGBA) color.NRGBA {
+	switch bg {
+	case pal.Accent, pal.Err, pal.Warn, pal.Ok, pal.Info:
+		return pal.OnAccent
+	}
+	return fallback
 }
 
 func rgb(c uint32) color.NRGBA {
@@ -160,7 +213,7 @@ func button(gtx C, th *material.Theme, cl *widget.Clickable, txt string, c color
 		}
 		return rbg(gtx, bgc, 6, func(gtx C) D {
 			return insetHV(12, 6).Layout(gtx, func(gtx C) D {
-				return lbl(gtx, th, fontSans, 13, pal.TextBright, txt)
+				return lbl(gtx, th, fontSans, 13, pal.OnAccent, txt)
 			})
 		})
 	})

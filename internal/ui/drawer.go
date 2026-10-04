@@ -238,7 +238,7 @@ func (d *Drawer) Layout(gtx C) D {
 		d.close()
 		return D{}
 	}
-	if d.editBtn.Clicked(gtx) {
+	if d.editBtn.Clicked(gtx) && d.app.allowMutation("Edit") {
 		d.setEditing(true)
 	}
 	if d.revertBtn.Clicked(gtx) {
@@ -246,8 +246,12 @@ func (d *Drawer) Layout(gtx C) D {
 		d.dirty = false
 		d.setEditing(false)
 	}
-	if d.saveBtn.Clicked(gtx) {
-		d.save()
+	if d.saveBtn.Clicked(gtx) && d.app.allowMutation("Apply") {
+		if d.app.protected() {
+			d.app.overlay = d.app.guard(newConfirm(d.app, "Apply", "Apply the edited manifest of "+d.path+"?", true, func(bool) { d.save() }), d.path)
+		} else {
+			d.save()
+		}
 	}
 	if d.revealBtn.Clicked(gtx) {
 		d.revealAll = !d.revealAll
@@ -345,6 +349,9 @@ func (d *Drawer) layoutTabActions(gtx C) D {
 	th := d.app.th
 	switch d.tab {
 	case tabYAML:
+		if d.app.readOnly() {
+			return iconText(gtx, th, icLock, 12, pal.TextDim, "read-only")
+		}
 		if !d.editing {
 			return pillButton(gtx, th, &d.editBtn, icEdit, "Edit", pal.Text, colorNRGBA{})
 		}

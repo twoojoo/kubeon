@@ -20,3 +20,7 @@ Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
 - `internal/backend` facade over k9s (watches, actions, logs, exec, port-forward, helm, xray, health).
 - `internal/ui` Gio app; `internal/ai` assistant (Anthropic SDK + OpenAI-compatible providers, read-only tools, redaction).
 - `internal/safety` dev-build kubeconfig/context guard; `internal/notify` D-Bus notifications.
+- `internal/prefs` user preferences (`~/.config/k9desk/settings.json`): theme, per-context policies
+  (protected/read-only), pinned port-forwards, bookmarks. UI mutations must go through
+  `allowMutation` / `guard` / `confirmMutation` (internal/ui/policy.go).
+- Tests that touch preferences set `K9DESK_CONFIG_DIR` to a dir under `.dev/`.

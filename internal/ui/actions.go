@@ -67,6 +67,9 @@ func (v *ResourceView) shell() {
 		return
 	}
 	a := v.app
+	if !a.allowMutation("Shell") {
+		return
+	}
 	c := a.cluster
 	path := r.ID
 	go func() {
@@ -76,13 +79,19 @@ func (v *ResourceView) shell() {
 				a.flash("containers: "+err.Error(), true)
 				return
 			}
+			open := func(co string) {
+				if a.protected() {
+					a.overlay = a.guard(newConfirm(a, "Open shell", fmt.Sprintf("Open an interactive shell in %s/%s?", path, co), true,
+						func(bool) { a.dock.openShell(path, co) }), path)
+					return
+				}
+				a.dock.openShell(path, co)
+			}
 			if len(cc) == 1 {
-				a.dock.openShell(path, cc[0])
+				open(cc[0])
 				return
 			}
-			p := newPicker(a, "Shell into container", cc, false, func(co string) {
-				a.dock.openShell(path, co)
-			})
+			p := newPicker(a, "Shell into container", cc, false, open)
 			p.icon = icTerminal
 			a.overlay = p
 		})
@@ -96,6 +105,9 @@ func (v *ResourceView) scale() {
 		return
 	}
 	a, gvr, path := v.app, v.gvr, r.ID
+	if !a.allowMutation("Scale") {
+		return
+	}
 	go func() {
 		cur, err := c.Replicas(gvr, path)
 		a.post(func() {
@@ -109,9 +121,16 @@ func (v *ResourceView) scale() {
 					a.flash("invalid replica count", true)
 					return
 				}
-				a.do(fmt.Sprintf("Scale %s to %d", path, n), func() error {
-					return c.Scale(gvr, path, int32(n))
-				})
+				run := func() {
+					a.do(fmt.Sprintf("Scale %s to %d", path, n), func() error {
+						return c.Scale(gvr, path, int32(n))
+					})
+				}
+				if a.protected() {
+					a.overlay = a.guard(newConfirm(a, "Scale", fmt.Sprintf("Scale %s from %d to %d replicas?", path, cur, n), true, func(bool) { run() }), path)
+					return
+				}
+				run()
 			})
 			p.editor.SetText(strconv.Itoa(int(cur)))
 			a.overlay = p
@@ -126,7 +145,7 @@ func (v *ResourceView) restart() {
 		return
 	}
 	a, gvr, path := v.app, v.gvr, r.ID
-	a.overlay = newConfirm(a, "Restart", fmt.Sprintf("Rollout restart %s?", path), false, func(bool) {
+	a.confirmMutation("Restart", fmt.Sprintf("Rollout restart %s?", path), path, false, func() {
 		a.do("Restart "+path, func() error { return c.Restart(gvr, path) })
 	})
 }
@@ -135,7 +154,7 @@ func (v *ResourceView) confirmDelete() {
 	r, ok := v.selected()
 	if ok && v.gvr == backend.HelmGVR {
 		a, c, rel := v.app, v.app.cluster, r.ID
-		a.overlay = newConfirm(a, "Uninstall", fmt.Sprintf("Uninstall helm release %s?", rel), true, func(bool) {
+		a.confirmMutation("Uninstall", fmt.Sprintf("Uninstall helm release %s?", rel), rel, true, func() {
 			a.do("Uninstall "+rel, func() error { return c.HelmUninstall(rel) })
 		})
 		return
@@ -144,9 +163,12 @@ func (v *ResourceView) confirmDelete() {
 		return
 	}
 	a, gvr, path, c := v.app, v.gvr, r.ID, v.app.cluster
-	a.overlay = newConfirm(a, "Delete", fmt.Sprintf("Delete %s %s?", titleFor(gvr), path), true, func(force bool) {
+	if !a.allowMutation("Delete") {
+		return
+	}
+	a.overlay = a.guard(newConfirm(a, "Delete", fmt.Sprintf("Delete %s %s?", titleFor(gvr), path), true, func(force bool) {
 		a.do("Delete "+path, func() error { return c.Delete(gvr, path, force) })
-	})
+	}), path)
 }
 
 func (a *App) pickNamespace() {
@@ -205,7 +227,7 @@ func (a *App) openPalette(prefill string) {
 			return false
 		}
 		switch f[0] {
-		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards", "notify", "notifications", "events", "ai", "assistant", "chat", "xray", "helm", "charts", "releases":
+		case "ns", "namespace", "ctx", "context", "q", "quit", "pf", "portforwards", "bm", "bookmarks", "bookmark", "theme", "settings", "prefs", "preferences", "tab", "notify", "notifications", "events", "ai", "assistant", "chat", "xray", "helm", "charts", "releases":
 			return true
 		}
 		_, ok := backend.LookupAlias(f[0])
@@ -241,7 +263,30 @@ func (a *App) runCommand(cmd string) {
 		a.connect(f[1])
 		return
 	case "pf", "portforwards":
-		a.pickForward()
+		a.overlay = newPortForwardPanel(a)
+		return
+	case "bm", "bookmarks":
+		a.pickBookmark()
+		return
+	case "bookmark":
+		a.bookmarkCurrent()
+		return
+	case "theme":
+		want := "light"
+		if len(f) > 1 {
+			want = f[1]
+		} else if a.prefs.Theme == "light" {
+			want = "dark"
+		}
+		if want != a.prefs.Theme {
+			a.toggleTheme()
+		}
+		return
+	case "settings", "prefs", "preferences":
+		a.overlay = newPrefsPanel(a)
+		return
+	case "tab":
+		a.newTab()
 		return
 	case "ai", "assistant", "chat":
 		a.ai.open = true
@@ -383,7 +428,7 @@ func (v *ResourceView) toggleCordon() {
 	if !on {
 		verb = "Uncordon"
 	}
-	a.overlay = newConfirm(a, verb, fmt.Sprintf("%s node %s?", verb, node), on, func(bool) {
+	a.confirmMutation(verb, fmt.Sprintf("%s node %s?", verb, node), node, on, func() {
 		a.do(verb+" "+node, func() error { return c.Cordon(node, on) })
 	})
 }
@@ -394,6 +439,9 @@ func (v *ResourceView) drain() {
 		return
 	}
 	a, c, node := v.app, v.app.cluster, r.ID
+	if !a.allowMutation("Drain") {
+		return
+	}
 	cf := newConfirmOpts(a, "Drain", fmt.Sprintf("Cordon %s and evict all its pods?", node), true,
 		[]string{"Ignore DaemonSets", "Delete emptyDir data", "Force (unmanaged pods)"}, []bool{true, false, false},
 		func(o []bool) {
@@ -405,7 +453,7 @@ func (v *ResourceView) drain() {
 				return err
 			})
 		})
-	a.overlay = cf
+	a.overlay = a.guard(cf, node)
 }
 
 func lastLine(s string) string {
@@ -443,7 +491,7 @@ func (v *ResourceView) rollback() {
 	}
 	a, c := v.app, v.app.cluster
 	rel, rev := backend.SplitHistoryID(r.ID)
-	a.overlay = newConfirm(a, "Rollback", fmt.Sprintf("Roll back %s to revision %s?", rel, rev), false, func(bool) {
+	a.confirmMutation("Rollback", fmt.Sprintf("Roll back %s to revision %s?", rel, rev), rel, false, func() {
 		a.do("Rollback "+rel+" to "+rev, func() error { return c.HelmRollback(rel, rev) })
 	})
 }

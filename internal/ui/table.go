@@ -48,6 +48,8 @@ type ResourceView struct {
 	}
 	headerClicks []widget.Clickable
 	rowsTag      int
+	marked       map[string]bool
+	bulkBtns     bulkButtons
 	hover        int
 	lastClick    time.Time
 	lastClickRow int
@@ -74,6 +76,7 @@ func (v *ResourceView) open(gvr, ns string) { v.openPath(gvr, ns, "") }
 func (v *ResourceView) openPath(gvr, ns, path string) {
 	v.close()
 	v.gvr, v.ns, v.path = gvr, ns, path
+	v.marked = nil
 	v.title = titleFor(gvr)
 	if path != "" {
 		v.title += "  ·  " + path
@@ -342,6 +345,9 @@ func (v *ResourceView) layoutToolbar(gtx C) D {
 
 // layoutActions is the contextual action bar for the selected object.
 func (v *ResourceView) layoutActions(gtx C) D {
+	if len(v.markedIDs()) > 1 {
+		return v.layoutBulkBar(gtx)
+	}
 	row, ok := v.selected()
 	if !ok {
 		return D{}
@@ -381,32 +387,33 @@ func (v *ResourceView) layoutActions(gtx C) D {
 	}
 	isPod := v.gvr == "v1/pods"
 	helm := isHelm(v.gvr)
+	rw := !v.app.readOnly()
 	isNode := v.gvr == "v1/nodes"
 	if isNode {
 		ic, txt := icCordon, "Cordon"
 		if nodeCordoned(row) {
 			ic, txt = icUncordon, "Uncordon"
 		}
-		add(&v.cordonBtn, ic, txt, true, false)
-		add(&v.drainBtn, icDrain, "Drain", true, true)
+		add(&v.cordonBtn, ic, txt, rw, false)
+		add(&v.drainBtn, icDrain, "Drain", rw, true)
 	}
 	add(&v.logsBtn, icLogs, "Logs", c.IsLoggable(v.gvr), false)
-	add(&v.shellBtn, icTerminal, "Shell", isPod, false)
+	add(&v.shellBtn, icTerminal, "Shell", isPod && rw, false)
 	add(&v.pfBtn, icForward, "Forward", canForward(v.gvr), false)
 	add(&v.xrayBtn, icXRay, "XRay", backend.CanXRay(v.gvr), false)
 	add(&v.decodeBtn, icSecret, "Decode", v.gvr == "v1/secrets", false)
 	add(&v.historyBtn, icHistory, "History", v.gvr == backend.HelmGVR, false)
 	add(&v.valuesBtn, icValues, "Values", helm, false)
-	add(&v.rollbackBtn, icRollback, "Rollback", v.gvr == backend.HelmHistoryGVR, true)
+	add(&v.rollbackBtn, icRollback, "Rollback", rw && v.gvr == backend.HelmHistoryGVR, true)
 	add(&v.descBtn, icDescribe, "Describe", true, false)
 	add(&v.yamlBtn, icEdit, "YAML", !helm, false)
-	add(&v.scaleBtn, icScale, "Scale", c.CanScale(v.gvr), false)
-	add(&v.restartBtn, icRestart, "Restart", c.CanRestart(v.gvr), false)
+	add(&v.scaleBtn, icScale, "Scale", rw && c.CanScale(v.gvr), false)
+	add(&v.restartBtn, icRestart, "Restart", rw && c.CanRestart(v.gvr), false)
 	delTxt := "Delete"
 	if v.gvr == backend.HelmGVR {
 		delTxt = "Uninstall"
 	}
-	add(&v.delBtn, icDelete, delTxt, v.gvr == backend.HelmGVR || (!helm && backend.CanVerb(v.gvr, "delete")), true)
+	add(&v.delBtn, icDelete, delTxt, rw && (v.gvr == backend.HelmGVR || (!helm && backend.CanVerb(v.gvr, "delete"))), true)
 	return bg(gtx, pal.Header, func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return layout.Inset{Left: 16, Right: 10, Top: 4, Bottom: 4}.Layout(gtx, func(gtx C) D {
@@ -657,10 +664,30 @@ func (v *ResourceView) layoutRows(gtx C, s *backend.Snapshot) D {
 		if idx < 0 || idx >= len(s.Rows) {
 			continue
 		}
+		switch {
+		case pe.Buttons == pointer.ButtonSecondary:
+			if !v.marked[s.Rows[idx].ID] {
+				v.clearMarks()
+			}
+			v.setSel(idx)
+			v.openContextMenu(v.app.pointer)
+			continue
+		case pe.Modifiers.Contain(key.ModShortcut):
+			v.setSel(idx)
+			v.toggleMark(s.Rows[idx].ID)
+			continue
+		case pe.Modifiers.Contain(key.ModShift) && v.sel >= 0:
+			lo, hi := min(v.sel, idx), max(v.sel, idx)
+			for i := lo; i <= hi; i++ {
+				v.mark(s.Rows[i].ID, true)
+			}
+			v.setSel(idx)
+			continue
+		}
 		double := idx == v.lastClickRow && time.Since(v.lastClick) < 400*time.Millisecond
 		v.lastClick, v.lastClickRow = time.Now(), idx
 		v.setSel(idx)
-		if pe.Buttons == pointer.ButtonSecondary || double {
+		if double {
 			v.enter()
 		}
 	}
@@ -699,12 +726,18 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 	r := s.Rows[i]
 	sz := image.Pt(gtx.Constraints.Max.X, rh)
 	sel := i == v.sel
+	marked := v.marked[r.ID]
 	switch {
 	case sel:
 		fillRect(gtx, pal.Selected, image.Rectangle{Max: sz})
 		fillRect(gtx, pal.Accent, image.Rect(0, 0, gtx.Dp(3), rh))
+	case marked:
+		fillRect(gtx, withAlpha(pal.Accent, 0x30), image.Rectangle{Max: sz})
 	case i == v.hover:
 		fillRect(gtx, pal.Hover, image.Rectangle{Max: sz})
+	}
+	if marked {
+		fillRect(gtx, pal.Accent, image.Rect(0, 0, gtx.Dp(3), rh))
 	}
 	fillRect(gtx, withAlpha(pal.Border, 0x70), image.Rect(0, rh-gtx.Dp(1), sz.X, rh))
 	if !sel && (r.State == backend.StateErr || r.State == backend.StatePending) {

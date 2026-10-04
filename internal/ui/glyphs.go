@@ -104,6 +104,13 @@ var (
 	icBug        = mustIcon(icons.ActionBugReport)
 	icOK         = mustIcon(icons.ActionCheckCircle)
 	icFilter     = mustIcon(icons.ContentFilterList)
+	icLock       = mustIcon(icons.ActionLock)
+	icSun        = mustIcon(icons.ImageBrightness7)
+	icMoon       = mustIcon(icons.ImageBrightness3)
+	icBookmark   = mustIcon(icons.ActionBookmark)
+	icTab        = mustIcon(icons.ActionTab)
+	icOpen       = mustIcon(icons.ActionOpenInBrowser)
+	icAdd        = mustIcon(icons.ContentAdd)
 	icAI         = mustIcon(icons.ImageFlare)
 	icSend       = mustIcon(icons.ContentSend)
 	icStop       = mustIcon(icons.AVStop)
@@ -179,6 +186,7 @@ var sectionIcons = map[string]*widget.Icon{
 	"Storage":          icStorage,
 	"Access Control":   icAccess,
 	"Helm":             icHelm,
+	"Bookmarks":        icBookmark,
 	"Custom Resources": icCRD,
 }
 
@@ -249,13 +257,13 @@ func iconText(gtx C, th *material.Theme, ic *widget.Icon, size unit.Sp, c colorN
 func pillButton(gtx C, th *material.Theme, cl *widget.Clickable, ic *widget.Icon, txt string, fg, bgc colorNRGBA) D {
 	return cl.Layout(gtx, func(gtx C) D {
 		b := bgc
-		c := fg
+		c := onColor(bgc, fg)
 		if cl.Hovered() {
-			b = lighten(pal.Panel, 0.08)
+			b = pal.Hover
 			if bgc.A > 0 {
 				b = lighten(bgc, 0.12)
 			}
-			c = pal.TextBright
+			c = onColor(bgc, pal.TextBright)
 		}
 		return rbg(gtx, b, 6, func(gtx C) D {
 			return insetHV(9, 5).Layout(gtx, func(gtx C) D {
@@ -350,7 +358,7 @@ func avatar(gtx C, th *material.Theme, name string, size unit.Dp) D {
 	g := gtx
 	g.Constraints = layout.Exact(image.Pt(s, s))
 	layout.Center.Layout(g, func(gtx C) D {
-		return lbl(gtx, th, fontSans, unit.Sp(float32(size)*0.4), pal.TextBright, ini)
+		return lbl(gtx, th, fontSans, unit.Sp(float32(size)*0.4), pal.OnAccent, ini)
 	})
 	return D{Size: image.Pt(s, s)}
 }

@@ -125,7 +125,7 @@ func (m *mdView) layout(gtx C, th *material.Theme, blocks []mdBlock, c colorNRGB
 					if m.codes[i].Clicked(gtx) && onCopy != nil {
 						onCopy(b.text)
 					}
-					return rbg(gtx, rgb(0x16191b), 6, func(gtx C) D {
+					return rbg(gtx, pal.CodeBg, 6, func(gtx C) D {
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
 						return inset(8).Layout(gtx, func(gtx C) D {
 							return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
