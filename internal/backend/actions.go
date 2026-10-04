@@ -7,10 +7,12 @@ import (
 	"reflect"
 	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
 
 	k9s "github.com/giovanni/k9desk/third_party/k9s"
@@ -137,11 +139,19 @@ func (c *Cluster) Restart(gvr, path string) error {
 	return r.Restart(c.baseContext(ctx, client.NewGVR(gvr), "", path), path, &metav1.PatchOptions{FieldManager: "k9desk"})
 }
 
-// Apply updates a resource from an edited YAML manifest.
-func (c *Cluster) Apply(gvr, manifest string) error {
+// Apply updates (or creates, when missing) a resource from a YAML manifest.
+func (c *Cluster) Apply(gvr, manifest string) error { return c.apply(gvr, manifest, false) }
+
+// ApplyDryRun validates a manifest server-side without persisting it.
+func (c *Cluster) ApplyDryRun(gvr, manifest string) error { return c.apply(gvr, manifest, true) }
+
+func (c *Cluster) apply(gvr, manifest string, dryRun bool) error {
 	var obj map[string]any
 	if err := yaml.Unmarshal([]byte(manifest), &obj); err != nil {
 		return fmt.Errorf("invalid yaml: %w", err)
+	}
+	if obj == nil {
+		return errors.New("empty manifest")
 	}
 	u := unstructured.Unstructured{Object: obj}
 	if u.GetName() == "" {
@@ -151,13 +161,20 @@ func (c *Cluster) Apply(gvr, manifest string) error {
 	if err != nil {
 		return err
 	}
-	ri := dial.Resource(client.NewGVR(gvr).GVR())
+	var ri dynamic.ResourceInterface = dial.Resource(client.NewGVR(gvr).GVR())
+	if ns := u.GetNamespace(); ns != "" {
+		ri = dial.Resource(client.NewGVR(gvr).GVR()).Namespace(ns)
+	}
 	ctx, cancel := timeoutCtx()
 	defer cancel()
-	if ns := u.GetNamespace(); ns != "" {
-		_, err = ri.Namespace(ns).Update(ctx, &u, metav1.UpdateOptions{FieldManager: "k9desk"})
-	} else {
-		_, err = ri.Update(ctx, &u, metav1.UpdateOptions{FieldManager: "k9desk"})
+	var dr []string
+	if dryRun {
+		dr = []string{metav1.DryRunAll}
+	}
+	_, err = ri.Update(ctx, &u, metav1.UpdateOptions{FieldManager: "k9desk", DryRun: dr})
+	if apierrors.IsNotFound(err) {
+		u.SetResourceVersion("")
+		_, err = ri.Create(ctx, &u, metav1.CreateOptions{FieldManager: "k9desk", DryRun: dr})
 	}
 	return err
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 const (
 	tabDescribe = iota
 	tabYAML
-	tabData   // decoded secret data
+	tabData     // decoded secret data
 	tabValues   // helm values
 	tabOverview // structured details
 	tabCount
@@ -43,6 +44,11 @@ type Drawer struct {
 	yaml     widget.Editor
 	details  *backend.Details
 	detV     *detailsView
+	yamlV    *yamlView
+	valV     *yamlView
+	valMsg   string
+	valLine  int
+	valWarn  string
 	values   widget.Editor
 
 	secret     []backend.SecretEntry
@@ -61,6 +67,7 @@ type Drawer struct {
 func newDrawer(a *App) *Drawer {
 	d := Drawer{app: a, revealed: map[string]bool{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
 	d.detV = newDetailsView(a)
+	d.yamlV, d.valV = newYAMLView(), newYAMLView()
 	d.describe.ReadOnly = true
 	d.yaml.ReadOnly = true
 	d.values.ReadOnly = true
@@ -135,6 +142,7 @@ func (d *Drawer) close() {
 
 func (d *Drawer) setEditing(on bool) {
 	d.editing = on
+	d.valMsg, d.valLine, d.valWarn = "", 0, ""
 	d.yaml.ReadOnly = !on
 	if on {
 		d.tab = tabYAML
@@ -187,6 +195,8 @@ func (d *Drawer) load() {
 				vals = "# no user-supplied values"
 			}
 			d.values.SetText(vals)
+			d.yamlV.set(y)
+			d.valV.set(vals)
 			d.original = y
 			d.secret = sec
 		})
@@ -258,12 +268,8 @@ func (d *Drawer) Layout(gtx C) D {
 		d.dirty = false
 		d.setEditing(false)
 	}
-	if d.saveBtn.Clicked(gtx) && d.app.allowMutation("Apply") {
-		if d.app.protected() {
-			d.app.overlay = d.app.guard(newConfirm(d.app, "Apply", "Apply the edited manifest of "+d.path+"?", true, func(bool) { d.save() }), d.path)
-		} else {
-			d.save()
-		}
+	if d.saveBtn.Clicked(gtx) && d.dirty && d.valMsg == "" && d.app.allowMutation("Apply") {
+		d.app.overlay = newDiffReview(d.app, "Review changes", d.path, d.gvr, d.original, d.yaml.Text(), d.save)
 	}
 	if d.revealBtn.Clicked(gtx) {
 		d.revealAll = !d.revealAll
@@ -287,6 +293,7 @@ func (d *Drawer) Layout(gtx C) D {
 		}
 		if _, ok := ev.(widget.ChangeEvent); ok && d.editing {
 			d.dirty = d.yaml.Text() != d.original
+			d.valMsg, d.valLine, d.valWarn = validateManifest(d.original, d.yaml.Text())
 		}
 	}
 	fill(gtx, pal.Panel)
@@ -339,6 +346,25 @@ func (d *Drawer) Layout(gtx C) D {
 			if d.editing {
 				fill(gtx, pal.Bg)
 			}
+			if !d.editing && (d.tab == tabYAML || d.tab == tabValues) && d.errMsg == "" {
+				v := d.yamlV
+				if d.tab == tabValues {
+					v = d.valV
+				}
+				return inset(8).Layout(gtx, func(gtx C) D { return v.Layout(gtx, th) })
+			}
+			if d.editing {
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					layout.Flexed(1, func(gtx C) D {
+						return inset(10).Layout(gtx, func(gtx C) D {
+							e := material.Editor(th, &d.yaml, "")
+							e.Font, e.TextSize, e.Color = fontMono, 12, pal.Text
+							return e.Layout(gtx)
+						})
+					}),
+					layout.Rigid(d.layoutValidation),
+				)
+			}
 			return inset(10).Layout(gtx, func(gtx C) D {
 				ed := &d.describe
 				switch d.tab {
@@ -375,7 +401,7 @@ func (d *Drawer) layoutTabActions(gtx C) D {
 			layout.Rigid(layout.Spacer{Width: 6}.Layout),
 			layout.Rigid(func(gtx C) D {
 				c := pal.Accent
-				if !d.dirty {
+				if !d.dirty || d.valMsg != "" {
 					c = pal.Border
 				}
 				return pillButton(gtx, th, &d.saveBtn, icStatusDone, "Save & Apply", pal.TextBright, c)
@@ -509,4 +535,32 @@ func (d *Drawer) tabButton(gtx C, i int) D {
 		fillRRect(gtx, pal.Accent, rect(gtx.Dp(6), dims.Size.Y-gtx.Dp(2), dims.Size.X-gtx.Dp(6), dims.Size.Y), gtx.Dp(1))
 	}
 	return dims
+}
+
+// layoutValidation shows the live validation state while editing YAML.
+func (d *Drawer) layoutValidation(gtx C) D {
+	th := d.app.th
+	ic, c, msg := icOK, pal.Ok, "Valid YAML"
+	switch {
+	case d.valMsg != "":
+		ic, c, msg = icError, pal.Err, d.valMsg
+		if d.valLine > 0 {
+			msg = fmt.Sprintf("line %d: %s", d.valLine, d.valMsg)
+		}
+	case d.valWarn != "":
+		ic, c, msg = icWarning, pal.Warn, d.valWarn
+	case !d.dirty:
+		ic, c, msg = icInfo, pal.TextDim, "No changes yet"
+	}
+	return bg(gtx, withAlpha(c, 0x1c), func(gtx C) D {
+		gtx.Constraints.Min.X = gtx.Constraints.Max.X
+		return insetHV(12, 6).Layout(gtx, func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Flexed(1, func(gtx C) D { return iconText(gtx, th, ic, 12, c, msg) }),
+				layout.Rigid(func(gtx C) D {
+					return lbl(gtx, th, fontSans, 11, pal.TextDim, "Save opens a diff + server dry run")
+				}),
+			)
+		})
+	})
 }

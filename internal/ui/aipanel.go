@@ -47,7 +47,7 @@ type chatItem struct {
 	expanded bool
 	md       mdView
 
-	toggle, approve, reject, copyBtn widget.Clickable
+	toggle, approve, reject, copyBtn, diffBtn widget.Clickable
 }
 
 func (it *chatItem) md2() []mdBlock {
@@ -543,6 +543,18 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 		danger := pr.Action == "delete" || pr.Action == "apply" || pr.Action == "cordon"
 		a.overlay = a.guard(newConfirm(a, "Approve", proposalTitle(pr)+"?", danger, func(bool) { p.execute(it) }), pr.Path())
 	}
+	if it.diffBtn.Clicked(gtx) && it.state == propPending && pr.Action == "apply" && a.allowMutation("Apply") {
+		c := a.cluster
+		go func() {
+			live, err := c.YAML(pr.GVR, pr.Path())
+			if err != nil {
+				live = "" // new object: everything is an addition
+			}
+			a.post(func() {
+				a.overlay = newDiffReview(a, "Review proposed manifest", pr.Path(), pr.GVR, live, pr.Manifest, func() { p.execute(it) })
+			})
+		}()
+	}
 	if it.reject.Clicked(gtx) && it.state == propPending {
 		it.state = propRejected
 		p.notes = append(p.notes, "the user rejected \""+proposalTitle(pr)+"\"")
@@ -591,6 +603,9 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 					case propPending:
 						return layout.Flex{}.Layout(gtx,
 							layout.Rigid(func(gtx C) D {
+								if pr.Action == "apply" {
+									return pillButton(gtx, th, &it.diffBtn, icEdit, "Review diff", pal.OnAccent, accent)
+								}
 								return pillButton(gtx, th, &it.approve, icOK, "Approve", pal.TextBright, accent)
 							}),
 							layout.Rigid(layout.Spacer{Width: 6}.Layout),
