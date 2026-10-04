@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"sort"
+	"strings"
 	"time"
 
 	"gioui.org/layout"
@@ -26,6 +27,8 @@ type OverviewView struct {
 	cancel context.CancelFunc
 	list   widget.List
 	ns     string
+	cards4 [4]widget.Clickable
+	warnCl []widget.Clickable
 }
 
 func newOverview(a *App) *OverviewView {
@@ -106,13 +109,25 @@ func (o *OverviewView) Layout(gtx C) D {
 			if i < len(sections) {
 				return layout.Inset{Bottom: 16}.Layout(gtx, sections[i])
 			}
-			return o.warning(gtx, &d.Warnings[i-len(sections)])
+			return o.warning(gtx, i-len(sections), &d.Warnings[i-len(sections)])
 		})
 	})
 }
 
-func card(gtx C, th *material.Theme, ic *widget.Icon, title, value, sub string, accent colorNRGBA) D {
-	return rbg(gtx, pal.Panel, 10, func(gtx C) D {
+func card(gtx C, th *material.Theme, cl *widget.Clickable, ic *widget.Icon, title, value, sub string, accent colorNRGBA) D {
+	return cl.Layout(gtx, func(gtx C) D {
+		border := pal.Panel
+		if cl.Hovered() {
+			border = withAlpha(accent, 0xb0)
+		}
+		return rborder(gtx, border, pal.Panel, 10, func(gtx C) D {
+			return cardBody(gtx, th, cl, ic, title, value, sub, accent)
+		})
+	})
+}
+
+func cardBody(gtx C, th *material.Theme, cl *widget.Clickable, ic *widget.Icon, title, value, sub string, accent colorNRGBA) D {
+	return func(gtx C) D {
 		gtx.Constraints.Min.X = gtx.Constraints.Max.X
 		return inset(16).Layout(gtx, func(gtx C) D {
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
@@ -121,7 +136,12 @@ func card(gtx C, th *material.Theme, ic *widget.Icon, title, value, sub string, 
 						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 11, pal.TextDim, title) }),
 						layout.Rigid(layout.Spacer{Height: 6}.Layout),
 						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 28, pal.TextBright, value) }),
-						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 12, accent, sub) }),
+						layout.Rigid(func(gtx C) D {
+							if cl.Hovered() {
+								return iconText(gtx, th, icCollapse, 12, pal.Accent, "View all")
+							}
+							return lbl(gtx, th, fontSans, 12, accent, sub)
+						}),
 					)
 				}),
 				layout.Rigid(func(gtx C) D {
@@ -131,7 +151,7 @@ func card(gtx C, th *material.Theme, ic *widget.Icon, title, value, sub string, 
 				}),
 			)
 		})
-	})
+	}(gtx)
 }
 
 func (o *OverviewView) cards(gtx C, d *backend.Overview) D {
@@ -149,18 +169,25 @@ func (o *OverviewView) cards(gtx C, d *backend.Overview) D {
 	if bad > 0 {
 		podC = pal.Err
 	}
+	targets := [4]string{"v1/nodes", "v1/pods", "apps/v1/deployments", "v1/namespaces"}
+	for i := range o.cards4 {
+		if o.cards4[i].Clicked(gtx) {
+			o.app.openResource(targets[i])
+			return D{}
+		}
+	}
 	items := []layout.Widget{
 		func(gtx C) D {
-			return card(gtx, th, icNode, "NODES", fmt.Sprintf("%d / %d", d.NodesReady, d.Nodes), "ready", nodeC)
+			return card(gtx, th, &o.cards4[0], icNode, "NODES", fmt.Sprintf("%d / %d", d.NodesReady, d.Nodes), "ready", nodeC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, icPod, "PODS", itoa(d.Pods), fmt.Sprintf("%d failing", bad), podC)
+			return card(gtx, th, &o.cards4[1], icPod, "PODS", itoa(d.Pods), fmt.Sprintf("%d failing", bad), podC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, icDeploy, "DEPLOYMENTS", itoa(d.Deployments), fmt.Sprintf("%d unavailable", d.DeploymentsBad), depC)
+			return card(gtx, th, &o.cards4[2], icDeploy, "DEPLOYMENTS", itoa(d.Deployments), fmt.Sprintf("%d unavailable", d.DeploymentsBad), depC)
 		},
 		func(gtx C) D {
-			return card(gtx, th, icNamespace, "NAMESPACES", itoa(d.Namespaces), "total", pal.Info)
+			return card(gtx, th, &o.cards4[3], icNamespace, "NAMESPACES", itoa(d.Namespaces), "total", pal.Info)
 		},
 	}
 	var ch []layout.FlexChild
@@ -302,35 +329,65 @@ func (o *OverviewView) phases(gtx C, d *backend.Overview) D {
 	})
 }
 
-func (o *OverviewView) warning(gtx C, w *backend.EventInfo) D {
+// warningTarget maps "Kind/name" + namespace to a gvr and path.
+func warningTarget(w *backend.EventInfo) (string, string, bool) {
+	kind, name, ok := strings.Cut(w.Object, "/")
+	if !ok {
+		return "", "", false
+	}
+	gvr, ok := backend.LookupAlias(kind)
+	if !ok {
+		return "", "", false
+	}
+	if backend.IsNamespaced(gvr) && w.Namespace != "" {
+		return gvr, w.Namespace + "/" + name, true
+	}
+	return gvr, name, true
+}
+
+func (o *OverviewView) warning(gtx C, i int, w *backend.EventInfo) D {
 	th := o.app.th
+	if len(o.warnCl) <= i {
+		o.warnCl = append(o.warnCl, make([]widget.Clickable, i+1-len(o.warnCl))...)
+	}
+	cl := &o.warnCl[i]
+	gvr, path, linkable := warningTarget(w)
+	if linkable && cl.Clicked(gtx) {
+		o.app.goTo(gvr, path)
+	}
 	return layout.Inset{Bottom: 6}.Layout(gtx, func(gtx C) D {
-		return rbg(gtx, pal.Panel, 8, func(gtx C) D {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			return insetHV(14, 10).Layout(gtx, func(gtx C) D {
-				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-					layout.Rigid(func(gtx C) D {
-						return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-							layout.Rigid(func(gtx C) D { return mdi(gtx, icWarning, pal.Warn, 15) }),
-							layout.Rigid(layout.Spacer{Width: 8}.Layout),
-							layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, pal.Warn, w.Reason) }),
-							layout.Rigid(layout.Spacer{Width: 10}.Layout),
-							layout.Flexed(1, func(gtx C) D {
-								return lbl(gtx, th, fontSans, 13, pal.TextBright, w.Namespace+"  ·  "+w.Object)
-							}),
-							layout.Rigid(func(gtx C) D {
-								age := duration.HumanDuration(time.Since(w.Last))
-								return lbl(gtx, th, fontSans, 12, pal.TextDim, fmt.Sprintf("×%d  %s ago", w.Count, age))
-							}),
-						)
-					}),
-					layout.Rigid(func(gtx C) D {
-						l := material.Body2(th, w.Message)
-						l.Color = pal.Text
-						l.MaxLines = 2
-						return l.Layout(gtx)
-					}),
-				)
+		bgc := pal.Panel
+		if linkable && cl.Hovered() {
+			bgc = pal.Hover
+		}
+		return cl.Layout(gtx, func(gtx C) D {
+			return rbg(gtx, bgc, 8, func(gtx C) D {
+				gtx.Constraints.Min.X = gtx.Constraints.Max.X
+				return insetHV(14, 10).Layout(gtx, func(gtx C) D {
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+						layout.Rigid(func(gtx C) D {
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								layout.Rigid(func(gtx C) D { return mdi(gtx, icWarning, pal.Warn, 15) }),
+								layout.Rigid(layout.Spacer{Width: 8}.Layout),
+								layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 13, pal.Warn, w.Reason) }),
+								layout.Rigid(layout.Spacer{Width: 10}.Layout),
+								layout.Flexed(1, func(gtx C) D {
+									return lbl(gtx, th, fontSans, 13, pal.TextBright, w.Namespace+"  ·  "+w.Object)
+								}),
+								layout.Rigid(func(gtx C) D {
+									age := duration.HumanDuration(time.Since(w.Last))
+									return lbl(gtx, th, fontSans, 12, pal.TextDim, fmt.Sprintf("×%d  %s ago", w.Count, age))
+								}),
+							)
+						}),
+						layout.Rigid(func(gtx C) D {
+							l := material.Body2(th, w.Message)
+							l.Color = pal.Text
+							l.MaxLines = 2
+							return l.Layout(gtx)
+						}),
+					)
+				})
 			})
 		})
 	})
