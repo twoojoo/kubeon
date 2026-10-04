@@ -24,6 +24,16 @@ case "${1:-up}" in
     fi
     "$KIND" export kubeconfig --name "$NAME" --kubeconfig "$KCFG"
     kc apply -f "$ROOT/testdata/fixtures.yaml"
+    # integration tests expect settled fixtures: healthy deployments and the
+    # crasher pod already in CrashLoopBackOff (takes a few restarts)
+    kc -n demo rollout status deploy/web deploy/jsonlog --timeout 180s
+    for _ in $(seq 1 90); do
+      if kc -n demo get pods -l app=crasher \
+          -o jsonpath='{.items[*].status.containerStatuses[*].state.waiting.reason}' | grep -q CrashLoopBackOff; then
+        break
+      fi
+      sleep 2
+    done
     if [[ "${STRESS:-0}" == "1" ]]; then
       kc create ns stress --dry-run=client -o yaml | kc apply -f -
       for i in $(seq 1 2000); do
