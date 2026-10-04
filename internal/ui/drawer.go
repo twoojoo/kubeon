@@ -18,11 +18,12 @@ const (
 	tabDescribe = iota
 	tabYAML
 	tabData   // decoded secret data
-	tabValues // helm values
+	tabValues   // helm values
+	tabOverview // structured details
 	tabCount
 )
 
-var tabNames = [tabCount]string{"Describe", "YAML", "Data", "Values"}
+var tabNames = [tabCount]string{"Describe", "YAML", "Data", "Values", "Overview"}
 
 // Drawer is the right-hand details panel: describe, YAML (editable),
 // decoded secret data, helm values.
@@ -40,6 +41,8 @@ type Drawer struct {
 
 	describe widget.Editor
 	yaml     widget.Editor
+	details  *backend.Details
+	detV     *detailsView
 	values   widget.Editor
 
 	secret     []backend.SecretEntry
@@ -57,6 +60,7 @@ type Drawer struct {
 
 func newDrawer(a *App) *Drawer {
 	d := Drawer{app: a, revealed: map[string]bool{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
+	d.detV = newDetailsView(a)
 	d.describe.ReadOnly = true
 	d.yaml.ReadOnly = true
 	d.values.ReadOnly = true
@@ -72,9 +76,11 @@ func (d *Drawer) tabs() []int {
 	case isHelm(d.gvr):
 		return []int{tabDescribe, tabValues}
 	case d.gvr == "v1/secrets":
-		return []int{tabData, tabDescribe, tabYAML}
-	default:
+		return []int{tabOverview, tabData, tabDescribe, tabYAML}
+	case !strings.Contains(d.gvr, "/"):
 		return []int{tabDescribe, tabYAML}
+	default:
+		return []int{tabOverview, tabDescribe, tabYAML}
 	}
 }
 
@@ -145,6 +151,10 @@ func (d *Drawer) load() {
 	d.loading, d.errMsg, d.dirty = true, "", false
 	go func() {
 		desc, derr := c.Describe(gvr, path)
+		var det *backend.Details
+		if !isHelm(gvr) {
+			det, _ = c.Details(gvr, path)
+		}
 		var (
 			y, vals string
 			yerr    error
@@ -170,6 +180,8 @@ func (d *Drawer) load() {
 				d.errMsg = yerr.Error()
 			}
 			d.describe.SetText(desc)
+			d.details = det
+			d.detV.reset()
 			d.yaml.SetText(y)
 			if strings.TrimSpace(vals) == "" || strings.TrimSpace(vals) == "{}" {
 				vals = "# no user-supplied values"
@@ -320,6 +332,9 @@ func (d *Drawer) Layout(gtx C) D {
 			gtx.Constraints.Min = gtx.Constraints.Max
 			if d.tab == tabData {
 				return d.layoutSecret(gtx)
+			}
+			if d.tab == tabOverview {
+				return d.detV.Layout(gtx, d.details)
 			}
 			if d.editing {
 				fill(gtx, pal.Bg)
@@ -480,6 +495,8 @@ func (d *Drawer) tabButton(gtx C, i int) D {
 		ic = icSecret
 	case tabValues:
 		ic = icValues
+	case tabOverview:
+		ic = icInfo
 	}
 	dims := cl.Layout(gtx, func(gtx C) D {
 		c := pal.TextDim

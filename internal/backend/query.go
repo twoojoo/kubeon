@@ -32,6 +32,22 @@ func (c *Cluster) SnapshotOnce(ctx context.Context, gvr, ns, filter string) (*Sn
 		}
 	}
 	deadline := time.After(20 * time.Second)
+	var empty *Snapshot
+	var grace <-chan time.Time
+	finish := func(s *Snapshot) *Snapshot {
+		if rx == nil {
+			return s
+		}
+		rows := s.Rows[:0:0]
+		for _, r := range s.Rows {
+			if rx.MatchString(r.ID + " " + strings.Join(r.Cells, " ")) {
+				rows = append(rows, r)
+			}
+		}
+		cp := *s
+		cp.Rows = rows
+		return &cp
+	}
 	for {
 		select {
 		case s := <-ch:
@@ -41,18 +57,17 @@ func (c *Cluster) SnapshotOnce(ctx context.Context, gvr, ns, filter string) (*Sn
 			if s.Err != nil && len(s.Rows) == 0 {
 				return nil, s.Err
 			}
-			if rx != nil {
-				rows := s.Rows[:0:0]
-				for _, r := range s.Rows {
-					if rx.MatchString(r.ID + " " + strings.Join(r.Cells, " ")) {
-						rows = append(rows, r)
-					}
+			if len(s.Rows) == 0 {
+				// informers may not be synced yet: give them a moment
+				empty = s
+				if grace == nil {
+					grace = time.After(1500 * time.Millisecond)
 				}
-				cp := *s
-				cp.Rows = rows
-				s = &cp
+				continue
 			}
-			return s, nil
+			return finish(s), nil
+		case <-grace:
+			return finish(empty), nil
 		case <-deadline:
 			return nil, fmt.Errorf("timeout listing %s", gvr)
 		case <-ctx.Done():

@@ -33,7 +33,7 @@ func (v *ResourceView) enter() {
 			}
 		}
 	}
-	v.details(tabDescribe)
+	v.details(tabOverview)
 }
 
 func (v *ResourceView) details(tab int) {

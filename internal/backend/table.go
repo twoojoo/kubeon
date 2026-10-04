@@ -101,6 +101,7 @@ type TableWatch struct {
 	seq     atomic.Uint64
 	pending atomic.Bool
 	kick    chan struct{}
+	started time.Time
 	closed  atomic.Bool
 }
 
@@ -137,6 +138,7 @@ func (c *Cluster) WatchPath(gvr, ns, path string, onSnap func(*Snapshot)) *Table
 		colorer: colorer,
 		sortAsc: true,
 		kick:    make(chan struct{}, 1),
+		started: time.Now(),
 	}
 	tw.mt.SetNamespace(ns)
 	tw.mt.SetLabelSelector(labels.Everything())
@@ -279,6 +281,15 @@ func (t *TableWatch) build() *Snapshot {
 	}
 	data := raw.Clone()
 	s.Total = data.RowCount()
+	if s.Total == 0 && lastErr == nil && time.Since(t.started) < 1500*time.Millisecond {
+		// informers may still be syncing: don't flash "no resources"
+		s.Loading = true
+		go func() {
+			time.Sleep(1600 * time.Millisecond)
+			t.trigger()
+		}()
+		return &s
+	}
 	if filter != "" {
 		if _, isLabel := labelSelector(filter); !isLabel {
 			data = data.Filter(model1.FilterOpts{Filter: filter})

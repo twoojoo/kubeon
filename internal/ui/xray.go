@@ -199,7 +199,7 @@ func (x *XRayView) openDetails() {
 	}
 	n := x.rows[x.sel].n
 	if isResource(n) {
-		x.app.drawer.show(n.GVR, n.ID, tabDescribe, false)
+		x.app.drawer.show(n.GVR, n.ID, tabOverview, false)
 	}
 }
 
