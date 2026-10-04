@@ -15,9 +15,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
 
-	k9s "github.com/giovanni/k9desk/third_party/k9s"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
+	k9s "github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
 )
 
 func cloneAccessor(a dao.Accessor) dao.Accessor {
@@ -136,7 +136,7 @@ func (c *Cluster) Restart(gvr, path string) error {
 	}
 	ctx, cancel := timeoutCtx()
 	defer cancel()
-	return r.Restart(c.baseContext(ctx, client.NewGVR(gvr), "", path), path, &metav1.PatchOptions{FieldManager: "k9desk"})
+	return r.Restart(c.baseContext(ctx, client.NewGVR(gvr), "", path), path, &metav1.PatchOptions{FieldManager: "kubeon"})
 }
 
 // Apply updates (or creates, when missing) a resource from a YAML manifest.
@@ -171,10 +171,10 @@ func (c *Cluster) apply(gvr, manifest string, dryRun bool) error {
 	if dryRun {
 		dr = []string{metav1.DryRunAll}
 	}
-	_, err = ri.Update(ctx, &u, metav1.UpdateOptions{FieldManager: "k9desk", DryRun: dr})
+	_, err = ri.Update(ctx, &u, metav1.UpdateOptions{FieldManager: "kubeon", DryRun: dr})
 	if apierrors.IsNotFound(err) {
 		u.SetResourceVersion("")
-		_, err = ri.Create(ctx, &u, metav1.CreateOptions{FieldManager: "k9desk", DryRun: dr})
+		_, err = ri.Create(ctx, &u, metav1.CreateOptions{FieldManager: "kubeon", DryRun: dr})
 	}
 	return err
 }

@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/model1"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/model1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

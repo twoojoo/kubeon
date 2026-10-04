@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/giovanni/k9desk/third_party/k9s/config/json"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/config/json"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/tools/clientcmd/api"
 )

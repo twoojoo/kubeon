@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/model"
-	"github.com/giovanni/k9desk/third_party/k9s/xray"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/model"
+	"github.com/giovanni/kubeon/third_party/k9s/xray"
 )
 
 // XNode is an immutable xray tree node (k9s xray renderers).

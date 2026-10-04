@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/k9desk/internal/backend"
-	"github.com/giovanni/k9desk/internal/safety"
+	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/giovanni/kubeon/internal/safety"
 )
 
 func devCluster(t *testing.T) *backend.Cluster {
@@ -74,9 +74,9 @@ func TestToolsDirect(t *testing.T) {
 
 // Real end-to-end run against a local Ollama model (free, offline).
 func TestAgentOllama(t *testing.T) {
-	model := os.Getenv("K9DESK_TEST_OLLAMA_MODEL")
+	model := os.Getenv("KUBEON_TEST_OLLAMA_MODEL")
 	if model == "" {
-		t.Skip("set K9DESK_TEST_OLLAMA_MODEL (e.g. llama3.1:8b)")
+		t.Skip("set KUBEON_TEST_OLLAMA_MODEL (e.g. llama3.1:8b)")
 	}
 	c := devCluster(t)
 	p := NewOpenAICompat("ollama", "", "http://localhost:11434/v1")
@@ -85,7 +85,7 @@ func TestAgentOllama(t *testing.T) {
 	defer cancel()
 	var tools []string
 	var final string
-	ag.Run(ctx, ContextInfo{KubeContext: "kind-k9desk-dev", Namespace: "demo", View: "Pods"},
+	ag.Run(ctx, ContextInfo{KubeContext: "kind-kubeon-dev", Namespace: "demo", View: "Pods"},
 		"Why is the crasher pod in namespace demo failing? Check its logs and events.", func(e Event) {
 			switch e.Kind {
 			case EvToolEnd:

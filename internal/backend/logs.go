@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
 )
 
 // batchLogs coalesces log items so the UI redraws at most ~20 times/sec.

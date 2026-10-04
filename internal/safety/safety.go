@@ -1,7 +1,7 @@
-// Package safety resolves which kubeconfig k9desk may use.
+// Package safety resolves which kubeconfig kubeon may use.
 //
 // Release builds behave like kubectl. Builds with the "dev" tag are locked to
-// the disposable kind cluster in .dev/kubeconfig (context kind-k9desk-*), so
+// the disposable kind cluster in .dev/kubeconfig (context kind-kubeon-*), so
 // development never touches real clusters configured on the machine.
 package safety
 
@@ -13,7 +13,7 @@ import (
 )
 
 // DevContextPrefix is the only context prefix allowed in dev builds.
-const DevContextPrefix = "kind-k9desk"
+const DevContextPrefix = "kind-kubeon"
 
 // ResolveKubeconfig returns the kubeconfig path to use.
 func ResolveKubeconfig(flag string) (string, error) {
@@ -71,7 +71,7 @@ func defaultKubeconfig() string {
 }
 
 func devKubeconfig() string {
-	if p := os.Getenv("K9DESK_DEV_KUBECONFIG"); p != "" {
+	if p := os.Getenv("KUBEON_DEV_KUBECONFIG"); p != "" {
 		return p
 	}
 	return filepath.Join(".dev", "kubeconfig")

@@ -1,4 +1,4 @@
-// Command k9desk is a native Kubernetes IDE (Lens-like) powered by the k9s engine.
+// Command kubeon is a native Kubernetes IDE (Lens-like) powered by the k9s engine.
 package main
 
 import (
@@ -8,9 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/giovanni/k9desk/internal/desktop"
-	"github.com/giovanni/k9desk/internal/safety"
-	"github.com/giovanni/k9desk/internal/ui"
+	"github.com/giovanni/kubeon/internal/desktop"
+	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/giovanni/kubeon/internal/safety"
+	"github.com/giovanni/kubeon/internal/ui"
 )
 
 func main() {
@@ -23,17 +24,18 @@ func main() {
 	)
 	flag.Parse()
 
+	prefs.MigrateLegacyDirs()
 	if err := setupLog(*logLevel); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	kc, err := safety.ResolveKubeconfig(*kubeconfig)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "k9desk:", err)
+		fmt.Fprintln(os.Stderr, "kubeon:", err)
 		os.Exit(2)
 	}
 	if *kctx != "" {
 		if err := safety.CheckContext(*kctx); err != nil {
-			fmt.Fprintln(os.Stderr, "k9desk:", err)
+			fmt.Fprintln(os.Stderr, "kubeon:", err)
 			os.Exit(2)
 		}
 	}
@@ -46,7 +48,7 @@ func main() {
 	desktop.ApplyCursorEnv()
 
 	if err := ui.Run(ui.Options{Kubeconfig: kc, Context: *kctx, Namespace: *ns, Resource: *resource}); err != nil {
-		fmt.Fprintln(os.Stderr, "k9desk:", err)
+		fmt.Fprintln(os.Stderr, "kubeon:", err)
 		os.Exit(1)
 	}
 }
@@ -61,11 +63,11 @@ func setupLog(level string) error {
 	if err != nil {
 		return err
 	}
-	dir = filepath.Join(dir, "k9desk")
+	dir = filepath.Join(dir, "kubeon")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "k9desk.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	f, err := os.OpenFile(filepath.Join(dir, "kubeon.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}

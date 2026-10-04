@@ -13,10 +13,10 @@ import (
 	"time"
 
 	backoff "github.com/cenkalti/backoff/v4"
-	"github.com/giovanni/k9desk/third_party/k9s"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	"github.com/sahilm/fuzzy"
 )
 

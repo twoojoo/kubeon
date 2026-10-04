@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/model1"
+	"github.com/giovanni/kubeon/third_party/k9s/model1"
 	"github.com/derailed/tcell/v2"
 )
 

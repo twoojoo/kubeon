@@ -19,10 +19,10 @@ func TestDevRefusesForeignContexts(t *testing.T) {
 	if CheckContext("prod-eu") == nil {
 		t.Fatal("prod-eu must be refused")
 	}
-	if err := CheckContext("kind-k9desk-dev"); err != nil {
+	if err := CheckContext("kind-kubeon-dev"); err != nil {
 		t.Fatal(err)
 	}
-	if got := FilterContexts([]string{"a", "kind-k9desk-dev"}); len(got) != 1 {
+	if got := FilterContexts([]string{"a", "kind-kubeon-dev"}); len(got) != 1 {
 		t.Fatalf("got %v", got)
 	}
 }

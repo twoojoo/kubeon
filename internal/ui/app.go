@@ -1,4 +1,4 @@
-// Package ui is the native Gio front-end of k9desk.
+// Package ui is the native Gio front-end of kubeon.
 package ui
 
 import (
@@ -20,10 +20,10 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/giovanni/k9desk/internal/backend"
-	"github.com/giovanni/k9desk/internal/notify"
-	"github.com/giovanni/k9desk/internal/prefs"
-	"github.com/giovanni/k9desk/internal/safety"
+	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/giovanni/kubeon/internal/notify"
+	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/giovanni/kubeon/internal/safety"
 )
 
 // Options configure the UI.
@@ -102,7 +102,7 @@ type overlay interface {
 // Run opens the main window and blocks until it is closed.
 func Run(opts Options) error {
 	a := newApp(opts, new(app.Window))
-	a.w.Option(app.Title("k9desk"), app.Size(unit.Dp(1440), unit.Dp(900)), app.MinSize(unit.Dp(800), unit.Dp(500)),
+	a.w.Option(app.Title("kubeon"), app.Size(unit.Dp(1440), unit.Dp(900)), app.MinSize(unit.Dp(800), unit.Dp(500)),
 		app.Decorated(false))
 	a.start()
 
@@ -116,7 +116,7 @@ func newApp(opts Options, w *app.Window) *App {
 	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load()}
 	setTheme(a.th, a.prefs.Theme)
 	if w != nil {
-		a.notifier = notify.New("k9desk")
+		a.notifier = notify.New("kubeon")
 	}
 	a.sidebar = newSidebar(&a)
 	a.title = newTitleBar(&a)
@@ -501,7 +501,7 @@ func (a *App) layoutWelcome(gtx C) D {
 			}),
 			layout.Rigid(layout.Spacer{Height: 14}.Layout),
 			layout.Rigid(func(gtx C) D {
-				return lbl(gtx, a.th, fontSans, 28, pal.TextBright, "k9desk")
+				return lbl(gtx, a.th, fontSans, 28, pal.TextBright, "kubeon")
 			}),
 			layout.Rigid(func(gtx C) D {
 				return lbl(gtx, a.th, fontSans, 13, pal.TextDim, "native Kubernetes IDE · powered by k9s")

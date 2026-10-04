@@ -1,14 +1,14 @@
-# k9desk — notes for Claude
+# kubeon — notes for Claude
 
 Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
 
 ## Hard rules
 - **Never use the kube contexts configured on this machine** (`~/.kube/config`, `$KUBECONFIG`).
-  Only the disposable kind cluster: `make dev-up` → `.dev/kubeconfig` (context `kind-k9desk-dev`).
+  Only the disposable kind cluster: `make dev-up` → `.dev/kubeconfig` (context `kind-kubeon-dev`).
   Always build/run/test with the `dev` tag (it refuses any other kubeconfig/context) and
   `env -u KUBECONFIG`; every kubectl goes through `./scripts/dev-cluster.sh kubectl …`.
 - No paid LLM calls without asking: AI tests use mock servers or local Ollama
-  (`K9DESK_TEST_OLLAMA_MODEL=llama3.1:8b`).
+  (`KUBEON_TEST_OLLAMA_MODEL=llama3.1:8b`).
 
 ## Build / test
 - Gio tags: `nox11,novulkan` (X11/Vulkan headers not installed; Wayland only).
@@ -20,7 +20,7 @@ Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
 - `internal/backend` facade over k9s (watches, actions, logs, exec, port-forward, helm, xray, health).
 - `internal/ui` Gio app; `internal/ai` assistant (Anthropic SDK + OpenAI-compatible providers, read-only tools, redaction).
 - `internal/safety` dev-build kubeconfig/context guard; `internal/notify` D-Bus notifications.
-- `internal/prefs` user preferences (`~/.config/k9desk/settings.json`): theme, per-context policies
+- `internal/prefs` user preferences (`~/.config/kubeon/settings.json`): theme, per-context policies
   (protected/read-only), pinned port-forwards, bookmarks. UI mutations must go through
   `allowMutation` / `guard` / `confirmMutation` (internal/ui/policy.go).
-- Tests that touch preferences set `K9DESK_CONFIG_DIR` to a dir under `.dev/`.
+- Tests that touch preferences set `KUBEON_CONFIG_DIR` to a dir under `.dev/`.

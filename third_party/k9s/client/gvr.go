@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	"github.com/fvbommel/sortorder"
 	"gopkg.in/yaml.v3"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

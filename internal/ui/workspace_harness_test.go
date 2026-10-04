@@ -18,13 +18,13 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 
-	"github.com/giovanni/k9desk/internal/prefs"
+	"github.com/giovanni/kubeon/internal/prefs"
 )
 
 func isolatedPrefs(t *testing.T) string {
 	dir, _ := filepath.Abs(filepath.Join("..", "..", ".dev", "prefs-test"))
 	_ = os.RemoveAll(dir)
-	t.Setenv("K9DESK_CONFIG_DIR", dir)
+	t.Setenv("KUBEON_CONFIG_DIR", dir)
 	return dir
 }
 

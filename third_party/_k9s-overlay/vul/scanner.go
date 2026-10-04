@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright Authors of K9s
-// k9desk overlay: image scanning is disabled; this stub keeps the API so
+// kubeon overlay: image scanning is disabled; this stub keeps the API so
 // dao/render compile without pulling grype/syft.
 
 package vul

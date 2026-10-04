@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Disposable kind cluster for k9desk development.
+# Disposable kind cluster for kubeon development.
 # SAFETY: everything uses the isolated kubeconfig .dev/kubeconfig.
 # Never touches ~/.kube/config or $KUBECONFIG.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-NAME="k9desk-dev"
+NAME="kubeon-dev"
 KCFG="$ROOT/.dev/kubeconfig"
 BIN="$ROOT/.dev/bin"
 unset KUBECONFIG

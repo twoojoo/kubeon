@@ -1,4 +1,4 @@
-# k9desk — native Kubernetes IDE (Gio UI + k9s engine)
+# kubeon — native Kubernetes IDE (Gio UI + k9s engine)
 #
 # `make run` / `make test-int` build with the `dev` tag: the binary is locked
 # to the disposable kind cluster in .dev/kubeconfig and refuses any other
@@ -12,13 +12,13 @@ DEV_TAGS := $(GIO_TAGS),dev
 .PHONY: build build-dev run test test-int dev-up dev-down vendor-k9s
 
 build:
-	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w' -o k9desk ./cmd/k9desk
+	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w' -o kubeon ./cmd/kubeon
 
 build-dev:
-	go build -tags '$(DEV_TAGS)' -o .dev/k9desk-dev ./cmd/k9desk
+	go build -tags '$(DEV_TAGS)' -o .dev/kubeon-dev ./cmd/kubeon
 
 run: build-dev
-	env -u KUBECONFIG .dev/k9desk-dev --kubeconfig .dev/kubeconfig $(ARGS)
+	env -u KUBECONFIG .dev/kubeon-dev --kubeconfig .dev/kubeconfig $(ARGS)
 
 test:
 	go vet -tags '$(DEV_TAGS)' ./internal/... ./cmd/...

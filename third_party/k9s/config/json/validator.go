@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	"github.com/xeipuuv/gojsonschema"
 	"gopkg.in/yaml.v3"
 )

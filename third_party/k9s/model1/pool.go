@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 )
 
 type jobFn func(ctx context.Context) error

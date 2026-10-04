@@ -19,7 +19,7 @@ import (
 	"gioui.org/widget"
 	"github.com/hinshun/vt10x"
 
-	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 const termText = unit.Sp(13)

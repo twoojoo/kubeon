@@ -58,7 +58,7 @@ type ProviderConfig struct {
 	APIKey  string `json:"apiKey,omitempty"` // prefer the env var; stored 0600
 }
 
-// Config is persisted in ~/.config/k9desk/ai.json.
+// Config is persisted in ~/.config/kubeon/ai.json.
 type Config struct {
 	Provider         string                    `json:"provider"`
 	Providers        map[string]ProviderConfig `json:"providers,omitempty"`
@@ -66,15 +66,15 @@ type Config struct {
 	path             string
 }
 
-// ConfigPath returns the config file location ($K9DESK_CONFIG_DIR overrides).
+// ConfigPath returns the config file location ($KUBEON_CONFIG_DIR overrides).
 func ConfigPath() string {
-	dir := os.Getenv("K9DESK_CONFIG_DIR")
+	dir := os.Getenv("KUBEON_CONFIG_DIR")
 	if dir == "" {
 		d, err := os.UserConfigDir()
 		if err != nil {
 			d = "."
 		}
-		dir = filepath.Join(d, "k9desk")
+		dir = filepath.Join(d, "kubeon")
 	}
 	return filepath.Join(dir, "ai.json")
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright Authors of K9s
-// k9desk overlay: grype-free version of upstream scan.go.
+// kubeon overlay: grype-free version of upstream scan.go.
 
 package vul
 

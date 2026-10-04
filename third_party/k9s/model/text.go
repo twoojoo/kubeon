@@ -6,7 +6,7 @@ package model
 import (
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s"
 	"github.com/sahilm/fuzzy"
 )
 

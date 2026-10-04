@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

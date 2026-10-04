@@ -7,9 +7,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/giovanni/k9desk/third_party/k9s/config"
-	"github.com/giovanni/k9desk/third_party/k9s/model1"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/config"
+	"github.com/giovanni/kubeon/third_party/k9s/model1"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 )
 
 // DecoratorFunc decorates a string.

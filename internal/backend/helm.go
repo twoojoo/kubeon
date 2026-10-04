@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
-	"github.com/giovanni/k9desk/third_party/k9s/render/helm"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/render/helm"
 )
 
 // Helm pseudo-resources served by k9s' helm DAOs.

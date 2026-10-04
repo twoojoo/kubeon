@@ -11,9 +11,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/render"
+	"github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/render"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

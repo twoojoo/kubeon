@@ -9,7 +9,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
-	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 // ---- multi-selection ----

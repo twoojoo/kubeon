@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
-	"github.com/giovanni/k9desk/third_party/k9s/vul"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/vul"
 	"github.com/derailed/tview"
 	"github.com/mattn/go-runewidth"
 	"golang.org/x/text/language"

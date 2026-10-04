@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
 	"github.com/fvbommel/sortorder"
 )
 

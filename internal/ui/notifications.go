@@ -15,8 +15,8 @@ import (
 	"gioui.org/widget/material"
 	"k8s.io/apimachinery/pkg/util/duration"
 
-	"github.com/giovanni/k9desk/internal/backend"
-	"github.com/giovanni/k9desk/internal/notify"
+	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/giovanni/kubeon/internal/notify"
 )
 
 const maxEvents = 300
@@ -65,7 +65,7 @@ func (a *App) onHealth(ev []backend.HealthEvent) {
 			body = b.String()
 		}
 		n := a.notifier
-		go func() { _ = n.Send("k9desk · "+summary, body, urg) }()
+		go func() { _ = n.Send("kubeon · "+summary, body, urg) }()
 	}
 	last := ev[len(ev)-1]
 	a.flash(last.Title+" — "+last.Body, last.Severity == backend.SevErr)

@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
 )
 
 // Link points to another resource.

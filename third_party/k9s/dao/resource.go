@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/giovanni/k9desk/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )

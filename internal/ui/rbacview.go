@@ -10,7 +10,7 @@ import (
 	"gioui.org/widget/material"
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 const rbacPage = "rbac-explorer"

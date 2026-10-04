@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/giovanni/k9desk/third_party/k9s"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
-	"github.com/giovanni/k9desk/third_party/k9s/health"
+	"github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/health"
 )
 
 // PulseListener represents a health model listener.

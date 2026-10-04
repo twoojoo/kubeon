@@ -17,8 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
-	"github.com/giovanni/k9desk/internal/safety"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
+	"github.com/giovanni/kubeon/internal/safety"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
 )
 
 // Runs only against the disposable kind cluster (.dev/kubeconfig).
@@ -160,7 +160,7 @@ func TestPortForward(t *testing.T) {
 	}
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(b), "k9desk-ok") {
+	if !strings.Contains(string(b), "kubeon-ok") {
 		t.Fatalf("body %q", b)
 	}
 	if len(c.PortForwards()) != 1 {
@@ -185,10 +185,10 @@ func TestMutations(t *testing.T) {
 	c := devCluster(t)
 	const cm = `apiVersion: v1
 kind: ConfigMap
-metadata: {name: k9desk-mut, namespace: demo}
+metadata: {name: kubeon-mut, namespace: demo}
 data: {v: "1"}
 `
-	_ = c.Delete("v1/configmaps", "demo/k9desk-mut", true)
+	_ = c.Delete("v1/configmaps", "demo/kubeon-mut", true)
 	dial, _ := c.conn.DynDial()
 	var u unstructuredObj
 	if err := yamlToObj(cm, &u); err != nil {
@@ -200,9 +200,9 @@ data: {v: "1"}
 	ch := make(chan *Snapshot, 16)
 	tw := c.Watch("v1/configmaps", "demo", func(s *Snapshot) { ch <- s })
 	defer tw.Close()
-	waitSnap(t, ch, func(s *Snapshot) bool { return hasRow(s, "demo/k9desk-mut") })
+	waitSnap(t, ch, func(s *Snapshot) bool { return hasRow(s, "demo/kubeon-mut") })
 
-	y, err := c.YAML("v1/configmaps", "demo/k9desk-mut")
+	y, err := c.YAML("v1/configmaps", "demo/kubeon-mut")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ data: {v: "1"}
 	}
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		y2, _ := c.YAML("v1/configmaps", "demo/k9desk-mut")
+		y2, _ := c.YAML("v1/configmaps", "demo/kubeon-mut")
 		if strings.Contains(y2, `v: "2"`) {
 			break
 		}
@@ -234,10 +234,10 @@ data: {v: "1"}
 		t.Fatal(err)
 	}
 
-	if err := c.Delete("v1/configmaps", "demo/k9desk-mut", false); err != nil {
+	if err := c.Delete("v1/configmaps", "demo/kubeon-mut", false); err != nil {
 		t.Fatal(err)
 	}
-	waitSnap(t, ch, func(s *Snapshot) bool { return !hasRow(s, "demo/k9desk-mut") })
+	waitSnap(t, ch, func(s *Snapshot) bool { return !hasRow(s, "demo/kubeon-mut") })
 }
 
 func hasRow(s *Snapshot, id string) bool {

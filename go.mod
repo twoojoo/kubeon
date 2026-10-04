@@ -1,4 +1,4 @@
-module github.com/giovanni/k9desk
+module github.com/giovanni/kubeon
 
 go 1.25.8
 

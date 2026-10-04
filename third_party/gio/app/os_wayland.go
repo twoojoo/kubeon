@@ -215,7 +215,7 @@ type window struct {
 	size         image.Point
 	config       Config
 	wsize        image.Point // window config size before going fullscreen or maximized
-	// k9desk patch: double-click detection on move areas.
+	// kubeon patch: double-click detection on move areas.
 	lastMovePress time.Duration
 	lastMovePos   f32.Point
 	inCompositor bool        // window is moving or being resized
@@ -587,7 +587,7 @@ func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 //export gio_onToplevelConfigure
 func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel, width, height C.int32_t, states *C.struct_wl_array) {
 	w := callbackLoad(data).(*window)
-	// k9desk patch: track maximized/fullscreen state changes initiated by
+	// kubeon patch: track maximized/fullscreen state changes initiated by
 	// the compositor (keyboard shortcuts, drag-to-top, drag-to-restore).
 	maximized, fullscreen, activated := false, false, false
 	if states != nil && states.size > 0 {
@@ -987,7 +987,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 		}
 		act, ok := w.w.ActionAt(w.lastPos)
 		if ok && act == system.ActionMove && (w.config.Mode == Windowed || w.config.Mode == Maximized) {
-			// k9desk patch: double-click on a move area toggles maximize;
+			// kubeon patch: double-click on a move area toggles maximize;
 			// maximized windows can be dragged (the compositor restores them).
 			now := time.Duration(t) * time.Millisecond
 			d := w.lastPos.Sub(w.lastMovePos)
@@ -1006,7 +1006,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 		}
 	}
 	if state == 1 && btn == pointer.ButtonSecondary {
-		// k9desk patch: right-click on a move area opens the compositor window menu.
+		// kubeon patch: right-click on a move area opens the compositor window menu.
 		if act, ok := w.w.ActionAt(w.lastPos); ok && act == system.ActionMove {
 			sc := float32(w.scale)
 			C.xdg_toplevel_show_window_menu(w.topLvl, w.disp.seat.seat, serial, C.int32_t(w.lastPos.X/sc), C.int32_t(w.lastPos.Y/sc))

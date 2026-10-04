@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/model1"
+	"github.com/giovanni/kubeon/third_party/k9s/model1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

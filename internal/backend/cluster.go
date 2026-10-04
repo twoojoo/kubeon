@@ -15,10 +15,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 
-	k9s "github.com/giovanni/k9desk/third_party/k9s"
-	"github.com/giovanni/k9desk/third_party/k9s/client"
-	"github.com/giovanni/k9desk/third_party/k9s/dao"
-	"github.com/giovanni/k9desk/third_party/k9s/watch"
+	k9s "github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/dao"
+	"github.com/giovanni/kubeon/third_party/k9s/watch"
 )
 
 const callTimeout = "15s"

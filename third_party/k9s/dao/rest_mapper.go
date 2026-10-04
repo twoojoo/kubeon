@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/restmapper"

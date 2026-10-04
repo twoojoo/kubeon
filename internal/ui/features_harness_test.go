@@ -14,7 +14,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 func selectRow(t *testing.T, h *harness, prefix string) {
@@ -63,7 +63,7 @@ func installChart(t *testing.T, kc string) {
 func TestUIFeatures(t *testing.T) {
 	dl := filepath.Join("..", "..", ".dev", "downloads")
 	_ = os.RemoveAll(dl)
-	t.Setenv("K9DESK_DOWNLOAD_DIR", dl)
+	t.Setenv("KUBEON_DOWNLOAD_DIR", dl)
 	h := newHarness(t, Options{Namespace: "demo", Resource: "secrets"})
 	a := h.a
 
@@ -136,7 +136,7 @@ func TestUIFeatures(t *testing.T) {
 
 	// --- nodes: cordon via UI
 	a.openResource("v1/nodes")
-	selectRow(t, h, "k9desk-dev")
+	selectRow(t, h, "kubeon-dev")
 	h.press("C")
 	h.waitFor("cordon confirm", func() bool { _, ok := a.overlay.(*Confirm); return ok })
 	h.shot("27-cordon-confirm")

@@ -1,4 +1,4 @@
-# k9desk
+# kubeon
 
 Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 
@@ -44,7 +44,7 @@ them in a confirmation dialog.
 | Ollama, LM Studio, vLLM, llama.cpp, LocalAI (local) | OpenAI-compatible endpoint | none |
 
 Settings (gear icon) store provider, model, endpoint and optionally a key in
-`~/.config/k9desk/ai.json` (mode 600); models can be listed from the endpoint. The
+`~/.config/kubeon/ai.json` (mode 600); models can be listed from the endpoint. The
 assistant can be disabled per kube context.
 
 Privacy: Secret values are never sent (data/stringData replaced, keys kept); env
@@ -52,12 +52,12 @@ vars with sensitive names, bearer tokens, passwords in URLs/logs, JWTs, cloud an
 VCS tokens and PEM private keys are redacted from every tool output.
 
 Local models need reliable tool calling (e.g. Llama 3.1 8B+, Qwen 2.5 7B+); very
-small models may describe tool calls instead of making them — k9desk executes
+small models may describe tool calls instead of making them — kubeon executes
 well-formed JSON calls written as text, but larger models give far better answers.
 
 ## Window chrome
 
-k9desk draws its own title bar (brand, centered command search, window
+kubeon draws its own title bar (brand, centered command search, window
 controls). Gio is vendored in
 `third_party/gio` with a small Wayland patch (`third_party/_gio-patches`,
 re-apply with `scripts/vendor-gio.sh`):
@@ -70,8 +70,8 @@ re-apply with `scripts/vendor-gio.sh`):
 ## Build & run
 
 ```sh
-make build            # release binary ./k9desk (uses $KUBECONFIG / ~/.kube/config like kubectl)
-./k9desk --context my-ctx --namespace default --resource deploy
+make build            # release binary ./kubeon (uses $KUBECONFIG / ~/.kube/config like kubectl)
+./kubeon --context my-ctx --namespace default --resource deploy
 ```
 
 Linux system deps: Wayland/EGL/xkbcommon (present). For X11 + Vulkan support install
@@ -81,11 +81,11 @@ and build with `make build GIO_TAGS=`.
 ## Development (safe by construction)
 
 Dev builds (`-tags dev`) are **locked to a disposable kind cluster**: they only accept a
-kubeconfig inside a `.dev/` directory and contexts named `kind-k9desk*`; client-go caches go
+kubeconfig inside a `.dev/` directory and contexts named `kind-kubeon*`; client-go caches go
 to `.dev/cache`. Real clusters configured on the machine are never touched.
 
 ```sh
-make dev-up           # kind cluster "k9desk-dev" → .dev/kubeconfig (+ fixtures; STRESS=1 adds 2000 configmaps)
+make dev-up           # kind cluster "kubeon-dev" → .dev/kubeconfig (+ fixtures; STRESS=1 adds 2000 configmaps)
 make run              # dev build against the kind cluster
 make test             # unit tests
 make test-int         # backend integration + headless UI tests; screenshots in .dev/shots/
@@ -96,7 +96,7 @@ make vendor-k9s       # re-vendor k9s (K9S_REF=vX.Y.Z), overlays in third_party/
 ## Layout
 
 ```
-cmd/k9desk            entry point, flags, logging (~/.cache/k9desk/k9desk.log)
+cmd/kubeon            entry point, flags, logging (~/.cache/kubeon/kubeon.log)
 internal/backend      facade over k9s: Cluster, TableWatch snapshots, actions, logs, exec, port-forward, overview
 internal/ui           Gio app: table, sidebar, drawer, dock (logs/terminal), picker/palette, overview, icons
 internal/safety       kubeconfig/context guard for dev builds

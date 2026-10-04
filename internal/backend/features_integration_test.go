@@ -16,7 +16,7 @@ import (
 
 func TestNodeCordon(t *testing.T) {
 	c := devCluster(t)
-	const node = "k9desk-dev-control-plane"
+	const node = "kubeon-dev-control-plane"
 	if err := c.Cordon(node, true); err != nil {
 		t.Fatal(err)
 	}

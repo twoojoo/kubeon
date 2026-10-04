@@ -9,7 +9,7 @@ K9S_REF="${K9S_REF:-v0.51.0}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DST="$ROOT/third_party/k9s"
 OVERLAY="$ROOT/third_party/_k9s-overlay" # "_" prefix: ignored by go build
-MOD="github.com/giovanni/k9desk/third_party/k9s"
+MOD="github.com/giovanni/kubeon/third_party/k9s"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

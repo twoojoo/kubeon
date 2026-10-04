@@ -16,9 +16,9 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/giovanni/k9desk/third_party/k9s/config/data"
-	"github.com/giovanni/k9desk/third_party/k9s/config/json"
-	"github.com/giovanni/k9desk/third_party/k9s/slogs"
+	"github.com/giovanni/kubeon/third_party/k9s/config/data"
+	"github.com/giovanni/kubeon/third_party/k9s/config/json"
+	"github.com/giovanni/kubeon/third_party/k9s/slogs"
 	"github.com/karrick/godirwalk"
 	"gopkg.in/yaml.v3"
 )

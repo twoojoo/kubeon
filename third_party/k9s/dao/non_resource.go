@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/giovanni/k9desk/third_party/k9s/client"
+	"github.com/giovanni/kubeon/third_party/k9s/client"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

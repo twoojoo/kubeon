@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/duration"
 
-	"github.com/giovanni/k9desk/internal/backend"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 const maxToolOutput = 14000
@@ -87,7 +87,7 @@ func (t *Tools) Specs() []ToolSpec {
 		mk("xray", "Dependency tree of a workload (deployment → replicasets → pods → containers, service accounts, config maps, secrets, PVCs) with health status.",
 			map[string]any{"kind": strProp("deployments, statefulsets, daemonsets, replicasets, services or pods"), "name": strProp("Optional resource name to focus on"), "namespace": strProp(nsDesc)},
 			"kind"),
-		mk("lint_cluster", "Run the k9desk sanitizer (Popeye-like checks): failing/pending pods, missing requests/limits/probes, floating image tags, privileged containers, unavailable deployments, services without endpoints, broken references, unused config, unbound PVCs, node problems.",
+		mk("lint_cluster", "Run the kubeon sanitizer (Popeye-like checks): failing/pending pods, missing requests/limits/probes, floating image tags, privileged containers, unavailable deployments, services without endpoints, broken references, unused config, unbound PVCs, node problems.",
 			map[string]any{"namespace": strProp(nsDesc), "min_severity": map[string]any{"type": "string", "enum": []string{"error", "warning", "info"}, "description": "Lowest severity to include (default warning)"}}),
 		mk("list_api_resources", "List resource kinds available in the cluster (including CRDs).", map[string]any{}),
 		mk("propose_action", "Propose a change for the user to review and confirm. NEVER assume it was executed: the user decides. Use for scale, restart, delete, apply (full manifest), cordon, uncordon.",

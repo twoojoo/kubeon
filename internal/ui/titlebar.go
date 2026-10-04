@@ -196,7 +196,7 @@ func (t *TitleBar) Layout(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D { return t.logo(gtx) }),
 			layout.Rigid(layout.Spacer{Width: 10}.Layout),
-			layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, "k9desk") }),
+			layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, "kubeon") }),
 		)
 	})
 	st.Pop()
@@ -258,7 +258,7 @@ func keyChip(gtx C, th *material.Theme, k string) D {
 	})
 }
 
-// logo draws the k9desk mark: an accent tile with a stylized helm wheel.
+// logo draws the kubeon mark: an accent tile with a stylized helm wheel.
 func (t *TitleBar) logo(gtx C) D {
 	s := gtx.Dp(24)
 	fillRRect(gtx, pal.Accent, image.Rect(0, 0, s, s), gtx.Dp(6))

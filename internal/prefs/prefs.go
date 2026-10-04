@@ -1,4 +1,4 @@
-// Package prefs persists user preferences in ~/.config/k9desk/settings.json:
+// Package prefs persists user preferences in ~/.config/kubeon/settings.json:
 // theme, per-context safety policies, saved port-forwards and bookmarks.
 package prefs
 
@@ -50,16 +50,16 @@ type Prefs struct {
 	path string
 }
 
-// Dir returns the config directory ($K9DESK_CONFIG_DIR overrides).
+// Dir returns the config directory ($KUBEON_CONFIG_DIR overrides).
 func Dir() string {
-	if d := os.Getenv("K9DESK_CONFIG_DIR"); d != "" {
+	if d := os.Getenv("KUBEON_CONFIG_DIR"); d != "" {
 		return d
 	}
 	d, err := os.UserConfigDir()
 	if err != nil {
 		d = "."
 	}
-	return filepath.Join(d, "k9desk")
+	return filepath.Join(d, "kubeon")
 }
 
 // Load reads the preferences (missing file → defaults).
@@ -162,4 +162,31 @@ func (p *Prefs) BookmarksFor(ctx string) []Bookmark {
 		}
 	}
 	return out
+}
+
+// MigrateLegacyDirs moves config and cache directories created under the
+// previous application name (k9desk) to the kubeon locations, once.
+func MigrateLegacyDirs() {
+	move := func(base string) {
+		if base == "" {
+			return
+		}
+		oldDir, newDir := filepath.Join(base, "k9desk"), filepath.Join(base, "kubeon")
+		if _, err := os.Stat(newDir); err == nil {
+			return
+		}
+		if st, err := os.Stat(oldDir); err == nil && st.IsDir() {
+			_ = os.Rename(oldDir, newDir)
+			// the log file keeps its old name inside; rename it too
+			_ = os.Rename(filepath.Join(newDir, "k9desk.log"), filepath.Join(newDir, "kubeon.log"))
+		}
+	}
+	if os.Getenv("KUBEON_CONFIG_DIR") == "" {
+		if d, err := os.UserConfigDir(); err == nil {
+			move(d)
+		}
+	}
+	if d, err := os.UserCacheDir(); err == nil {
+		move(d)
+	}
 }

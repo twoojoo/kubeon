@@ -1,6 +1,10 @@
 package prefs
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestLooksProduction(t *testing.T) {
 	for _, c := range []string{"prod", "eks-prod-eu", "gke_acme_production", "aks-prd", "live-cluster", "PROD"} {
@@ -8,7 +12,7 @@ func TestLooksProduction(t *testing.T) {
 			t.Errorf("%q should look like production", c)
 		}
 	}
-	for _, c := range []string{"kind-k9desk-dev", "staging", "product-team-dev", "olive"} {
+	for _, c := range []string{"kind-kubeon-dev", "staging", "product-team-dev", "olive"} {
 		if LooksProduction(c) {
 			t.Errorf("%q should not look like production", c)
 		}
@@ -16,7 +20,7 @@ func TestLooksProduction(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	t.Setenv("K9DESK_CONFIG_DIR", t.TempDir())
+	t.Setenv("KUBEON_CONFIG_DIR", t.TempDir())
 	p := Load()
 	if p.Theme != "dark" || !p.Protected("prod") || p.Protected("dev") {
 		t.Fatal("defaults")
@@ -38,5 +42,23 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if b := q.BookmarksFor("any"); len(b) != 1 || b[0].Filter != "web" {
 		t.Fatalf("bookmarks %+v", b)
+	}
+}
+
+func TestMigrateLegacyDirs(t *testing.T) {
+	cfg, cache := t.TempDir(), t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("XDG_CACHE_HOME", cache)
+	t.Setenv("KUBEON_CONFIG_DIR", "")
+	_ = os.MkdirAll(filepath.Join(cfg, "k9desk"), 0o700)
+	_ = os.WriteFile(filepath.Join(cfg, "k9desk", "settings.json"), []byte(`{"theme":"light"}`), 0o600)
+	_ = os.MkdirAll(filepath.Join(cache, "k9desk"), 0o700)
+	_ = os.WriteFile(filepath.Join(cache, "k9desk", "k9desk.log"), []byte("x"), 0o600)
+	MigrateLegacyDirs()
+	if Load().Theme != "light" {
+		t.Fatal("settings not migrated")
+	}
+	if _, err := os.Stat(filepath.Join(cache, "kubeon", "kubeon.log")); err != nil {
+		t.Fatal("log not migrated")
 	}
 }

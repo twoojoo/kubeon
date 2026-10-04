@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/k9desk/internal/ai"
+	"github.com/giovanni/kubeon/internal/ai"
 )
 
 func TestUIAssistant(t *testing.T) {
 	cfgDir, _ := filepath.Abs(filepath.Join("..", "..", ".dev", "aiconfig"))
 	_ = os.RemoveAll(cfgDir)
-	t.Setenv("K9DESK_CONFIG_DIR", cfgDir)
-	model := os.Getenv("K9DESK_TEST_OLLAMA_MODEL")
+	t.Setenv("KUBEON_CONFIG_DIR", cfgDir)
+	model := os.Getenv("KUBEON_TEST_OLLAMA_MODEL")
 	if model == "" {
 		model = "llama3.1:8b"
 	}
@@ -58,7 +58,7 @@ func TestUIAssistant(t *testing.T) {
 		t.Fatalf("notes %v", a.ai.notes)
 	}
 
-	if os.Getenv("K9DESK_TEST_OLLAMA_MODEL") == "" {
+	if os.Getenv("KUBEON_TEST_OLLAMA_MODEL") == "" {
 		return
 	}
 	a.ai.reset()

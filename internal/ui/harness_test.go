@@ -20,8 +20,8 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 
-	"github.com/giovanni/k9desk/internal/backend"
-	"github.com/giovanni/k9desk/internal/safety"
+	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/giovanni/kubeon/internal/safety"
 )
 
 // harness renders the real App offscreen against the disposable kind
@@ -182,13 +182,13 @@ func TestUIFlow(t *testing.T) {
 		return ok && tm.sess != nil
 	})
 	h.settle(time.Second)
-	h.typeText("echo hello-from-k9desk && uname -a")
+	h.typeText("echo hello-from-kubeon && uname -a")
 	h.press(key.NameReturn)
 	h.settle(1500 * time.Millisecond)
 	h.shot("06-shell")
 	tm := a.dock.tabs[len(a.dock.tabs)-1].(*Terminal)
 	screen := tm.vt.String()
-	if !strings.Contains(screen, "hello-from-k9desk") {
+	if !strings.Contains(screen, "hello-from-kubeon") {
 		t.Fatalf("shell output missing:\n%s", screen)
 	}
 

@@ -71,7 +71,7 @@ func TestDetails(t *testing.T) {
 	if err != nil || findSection(cm, "Used by") == nil {
 		t.Fatalf("configmap: %v", err)
 	}
-	node, err := c.Details("v1/nodes", "k9desk-dev-control-plane")
+	node, err := c.Details("v1/nodes", "kubeon-dev-control-plane")
 	if err != nil || findSection(node, "Pods on node") == nil {
 		t.Fatalf("node: %v", err)
 	}
