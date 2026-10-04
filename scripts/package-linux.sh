@@ -16,14 +16,16 @@ IMAGE="kubeon-build-linux"
 
 if [[ "${1:-}" != "--inside" ]]; then
   docker build -t "$IMAGE" packaging/linux
-  mkdir -p "$DIST" .dev/docker-cache/go-build
+  # create the bind-mount sources first, or Docker makes them root-owned
+  GOMOD="$(go env GOMODCACHE)"
+  mkdir -p "$DIST" .dev/docker-cache/go-build "$GOMOD"
   exec docker run --rm \
     --user "$(id -u):$(id -g)" \
     -e HOME=/tmp -e VERSION="$VERSION" -e DIST="$DIST" \
     -e GOCACHE=/cache/go-build -e GOMODCACHE=/gomod \
     -v "$ROOT:/src" -w /src \
     -v "$ROOT/.dev/docker-cache:/cache" \
-    -v "$(go env GOMODCACHE):/gomod" \
+    -v "$GOMOD:/gomod" \
     "$IMAGE" scripts/package-linux.sh --inside
 fi
 
