@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/giovanni/k9desk/internal/desktop"
 	"github.com/giovanni/k9desk/internal/safety"
 	"github.com/giovanni/k9desk/internal/ui"
 )
@@ -40,6 +41,9 @@ func main() {
 	if safety.Dev {
 		slog.Info("dev build: locked to", "kubeconfig", kc)
 	}
+
+	// match the desktop cursor (Gio's Wayland backend defaults to size 32)
+	desktop.ApplyCursorEnv()
 
 	if err := ui.Run(ui.Options{Kubeconfig: kc, Context: *kctx, Namespace: *ns, Resource: *resource}); err != nil {
 		fmt.Fprintln(os.Stderr, "k9desk:", err)
