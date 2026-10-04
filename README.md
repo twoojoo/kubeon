@@ -62,7 +62,7 @@ Release packages (GitHub releases, or build them yourself — see Packaging):
 
 | OS | Packages | Notes |
 |---|---|---|
-| Linux amd64/arm64 | `.AppImage`, `.deb`, `.rpm`, `.tar.gz` | glibc ≥ 2.34 (Ubuntu 22.04+, Debian 12+, Fedora 35+); Wayland or X11 |
+| Linux amd64 (arm64: `make package-linux` on an arm64 host) | `.AppImage`, `.deb`, `.rpm`, `.tar.gz` | glibc ≥ 2.34 (Ubuntu 22.04+, Debian 12+, Fedora 35+); Wayland or X11 |
 | Windows 10+ amd64/arm64 | portable `.zip` (`kubeon.exe`) | unsigned: SmartScreen asks once ("More info → Run anyway") |
 | macOS 11+ (universal) | `.dmg`, `.zip` | ad-hoc signed unless built with a Developer ID: first launch via right-click → Open, or `xattr -dr com.apple.quarantine /Applications/kubeon.app` |
 

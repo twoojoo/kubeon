@@ -60,7 +60,8 @@ jobs:
       matrix:
         include:
           - { runner: ubuntu-24.04, arch: amd64 }
-          - { runner: ubuntu-24.04-arm, arch: arm64 }
+          # arm64 hosted runners are free only for public repositories:
+          # - { runner: ubuntu-24.04-arm, arch: arm64 }
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
