@@ -63,9 +63,9 @@ var lightPal = Palette{
 	Border:     rgb(0xd5dae0),
 	Hover:      rgb(0xe3e7ec),
 	Selected:   rgb(0xd3e5f6),
-	Text:       rgb(0x39404a),
-	TextDim:    rgb(0x77808b),
-	TextBright: rgb(0x111519),
+	Text:       rgb(0x262c33),
+	TextDim:    rgb(0x5d6570),
+	TextBright: rgb(0x0d1014),
 	Accent:     rgb(0x2b7bbd),
 	Ok:         rgb(0x2a9446),
 	Warn:       rgb(0xc96f00),
@@ -83,8 +83,14 @@ var pal = darkPal
 // setTheme switches the palette ("dark" | "light").
 func setTheme(th *material.Theme, name string) {
 	pal = darkPal
+	fontSans = font.Font{Typeface: "Go"}
 	if name == "light" {
 		pal = lightPal
+		// Gio blends text in linear space without stem darkening: dark
+		// glyphs on a light background come out thin and grey. Go Medium
+		// (its own family in the Go fonts) compensates; light text on dark
+		// backgrounds doesn't need it.
+		fontSans = font.Font{Typeface: "Go Medium", Weight: font.Medium}
 	}
 	if th != nil {
 		th.Palette = material.Palette{Bg: pal.Bg, Fg: pal.Text, ContrastBg: pal.Accent, ContrastFg: pal.OnAccent}
@@ -126,8 +132,9 @@ func stateColor(s backend.RowState) color.NRGBA {
 }
 
 var (
-	fontSans = font.Font{Typeface: "Go"}
+	fontSans = font.Font{Typeface: "Go"} // "Go Medium" in the light theme (setTheme)
 	fontMono = font.Font{Typeface: "Go Mono"}
+	fontBold = font.Font{Typeface: "Go", Weight: font.SemiBold} // the Go fonts' bold face
 )
 
 func newTheme() *material.Theme {

@@ -93,9 +93,7 @@ func inlineSpans(s string, size unit.Sp, c colorNRGBA) []richtext.SpanStyle {
 				return out
 			}
 			add(s[:ib], fontSans, c)
-			bf := fontSans
-			bf.Weight = 600
-			add(s[ib+2:ib+2+end], bf, pal.TextBright)
+			add(s[ib+2:ib+2+end], fontBold, pal.TextBright)
 			s = s[ib+4+end:]
 		default:
 			add(s, fontSans, c)
@@ -149,8 +147,7 @@ func (m *mdView) layout(gtx C, th *material.Theme, blocks []mdBlock, c colorNRGB
 						})
 					})
 				case b.heading > 0:
-					bf := fontSans
-					bf.Weight = 600
+					bf := fontBold
 					size := unit.Sp(15)
 					if b.heading >= 3 {
 						size = 13.5
