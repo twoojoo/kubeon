@@ -150,19 +150,33 @@ repository's README.
 
 ### Upstream k9s
 
+`scripts/k9s-upstream-report.sh [tag|branch]` (default: latest release) tells
+what moving the vendored k9s there would take:
+
+| | |
+|---|---|
+| **verdict** | ✅ looks safe · ⚠️ needs attention · ❌ will break |
+| **kubeon patches** | each file of `third_party/_k9s-patches` dry-run against the target exactly as vendoring applies it (no fuzz): applies cleanly · **already upstream** (drop it) · only with fuzz (context moved: review) · **conflict** (with `patch`'s messages) |
+| **overlays** | `third_party/_k9s-overlay` files changed or removed upstream |
+| **API** | incompatible changes found by `apidiff` in every vendored package, split into those touching what kubeon uses (`go run ./scripts/k9suse` lists it: functions, types, methods, fields and the k9s types in their signatures) and the rest; packages removed or no longer building included |
+| **history** | release notes, commits touching the vendored packages, per-package diffstat |
+
+`scripts/k9s-upstream-report-test.sh` checks every outcome end to end
+(conflict, fuzz, already upstream, API change used/unused, interface change,
+package removed/broken, unresolvable dependency).
+
 `.github/workflows/upstream-k9s.yml` runs daily:
 
-- keeps the **"k9s upstream watch"** issue up to date with what k9s `master`
-  changed in the vendored packages since the vendored release (commits,
-  per-package diffstat, files kubeon patches or overlays);
-- when a **new k9s release** is out, re-vendors it, re-applies
-  `third_party/_k9s-patches` and the overlays, runs `go mod tidy`, build, unit
-  and kind integration tests, and opens a pull request (draft if anything
-  failed) with the report — or an issue, if Actions may not open PRs. Run it
-  by hand with a tag or branch (`ref`) to try one early.
+- keeps the **"k9s upstream watch"** issue current with the report against
+  k9s `master` (body edits are silent; a comment, i.e. a notification, only
+  when the verdict changes);
+- when a **new k9s release** is out: re-vendors it (patches applied strictly,
+  no fuzz), `go mod tidy`, build, unit and kind integration tests, then opens a
+  pull request (draft if anything failed) with the report — an issue if
+  Actions may not open PRs, or **"k9s X: update blocked"** when a patch no
+  longer applies. Run it by hand with `ref` to try a tag or branch early.
 
-Locally: `scripts/k9s-upstream-report.sh [tag|master]` prints the same report;
-`K9S_REF=<tag> make vendor-k9s` re-vendors (default: the version in
+`K9S_REF=<tag> make vendor-k9s` re-vendors locally (default: the version in
 `third_party/k9s/UPSTREAM`).
 
 ## Development (safe by construction)

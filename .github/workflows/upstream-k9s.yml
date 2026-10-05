@@ -1,7 +1,10 @@
 # Daily watch of the upstream k9s project (vendored in third_party/k9s).
 #
-# watch: rewrites the "k9s upstream watch" issue with what changed on k9s
-#        master in the vendored packages (no notification: body edits only).
+# watch: rewrites the "k9s upstream watch" issue with the report on moving to
+#        k9s master: kubeon's patches dry-run file by file (strict), API
+#        changes that touch what kubeon uses, commits and diffstat. The body
+#        is edited silently; a comment (= a notification) is added only when
+#        the verdict changes (ok ⇄ warn ⇄ fail).
 # bump:  when a new k9s release is out (or `ref` is given by hand), re-vendors
 #        it, re-applies kubeon's patches, runs the unit and kind integration
 #        suites and opens a pull request (draft if anything failed) carrying
@@ -40,24 +43,35 @@ jobs:
       bump: ${{ steps.check.outputs.bump }}
     steps:
       - uses: actions/checkout@v4
-      - name: drift vs k9s master → tracking issue
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: report vs k9s master → tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           scripts/k9s-upstream-report.sh master > drift.md
           cat drift.md >> "$GITHUB_STEP_SUMMARY"
+          verdict="$(sed -n 's/^<!-- verdict: \(.*\) -->$/\1/p' drift.md | tail -1)"
           {
-            echo "_Updated $(date -u '+%Y-%m-%d %H:%M UTC') by \`.github/workflows/upstream-k9s.yml\`: what k9s master changed in the packages kubeon vendors since the vendored release._"
+            echo "_Updated $(date -u '+%Y-%m-%d %H:%M UTC') by \`.github/workflows/upstream-k9s.yml\`: what moving the vendored k9s to master would take._"
             echo
             head -c 60000 drift.md
+            echo
+            echo "<!-- verdict: $verdict -->" # again: truncation may have cut it
           } > body.md
           gh label create upstream --color 5319e7 --description "upstream k9s tracking" 2>/dev/null || true
           num="$(gh issue list --label upstream --state open --json number,title \
             --jq "map(select(.title == \"$WATCH_TITLE\")) | .[0].number // empty")"
-          if [ -n "$num" ]; then
-            gh issue edit "$num" --body-file body.md
-          else
+          if [ -z "$num" ]; then
             gh issue create --title "$WATCH_TITLE" --label upstream --body-file body.md
+            exit 0
+          fi
+          before="$(gh issue view "$num" --json body --jq .body | sed -n 's/^<!-- verdict: \(.*\) -->$/\1/p' | tail -1)"
+          gh issue edit "$num" --body-file body.md
+          if [ -n "$before" ] && [ "$before" != "$verdict" ]; then
+            headline="$(grep -m1 -E '^(✅|⚠️|❌) ' drift.md || true)"
+            gh issue comment "$num" --body "Verdict changed: **$before → $verdict**. $headline See the issue body for details."
           fi
       - id: check
         name: new release?
@@ -73,6 +87,12 @@ jobs:
           fi
           if gh api "repos/$GITHUB_REPOSITORY/branches/upstream/k9s-$want" >/dev/null 2>&1; then
             echo "k9s $want already proposed (branch upstream/k9s-$want; delete it to retry)"
+            exit 0
+          fi
+          prev="$(gh issue list --label upstream --state all --search "\"k9s $want\" in:title" \
+            --json title --jq "map(select(.title | startswith(\"k9s $want:\"))) | length")"
+          if [ "${prev:-0}" -gt 0 ]; then
+            echo "k9s $want already reported in an issue (delete or rename it to retry)"
             exit 0
           fi
           echo "bump=$want" >> "$GITHUB_OUTPUT"
@@ -132,6 +152,13 @@ jobs:
             echo
             cat report.md
           } | head -c 65000 > pr.md
+          gh label create upstream --color 5319e7 --description "upstream k9s tracking" 2>/dev/null || true
+          if [ "$VENDOR" != success ]; then
+            # a patch no longer applies: nothing sane to commit, report it
+            git checkout -q -- . && git clean -qfd third_party/k9s
+            gh issue create --title "k9s $REF: update blocked" --label upstream --body-file pr.md
+            exit 0
+          fi
           branch="upstream/k9s-$REF"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -143,11 +170,10 @@ jobs:
           for o in "$VENDOR" "$BUILD" "$UNIT" "$INTEGRATION"; do
             [ "$o" = success ] || draft="--draft"
           done
-          gh label create upstream --color 5319e7 --description "upstream k9s tracking" 2>/dev/null || true
           if ! gh pr create --base main --head "$branch" --title "Bump vendored k9s to $REF" \
               --label upstream --body-file pr.md $draft; then
             echo "::warning::Actions may not open PRs here: opening an issue instead"
-            gh issue create --title "k9s $REF ready on branch $branch" --label upstream --body-file pr.md
+            gh issue create --title "k9s $REF: update ready on branch $branch" --label upstream --body-file pr.md
           fi
       - if: always()
         uses: actions/upload-artifact@v4
