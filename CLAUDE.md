@@ -20,6 +20,10 @@ Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
   to change Gio, edit the vendored file and regenerate the matching patch (verify it reapplies cleanly).
 
 ## Packaging
+- Self-update (`internal/update`) installs only releases whose SHA256SUMS.txt verifies with the built-in
+  ed25519 public key; the private key is `.dev/update-signing.key` locally and the `UPDATE_SIGNING_KEY`
+  repo secret in CI. Never print, commit or regenerate it. Dev builds never update.
+- `scripts/notices.sh` builds THIRD_PARTY_NOTICES.txt (k9s is inside our module: added by hand).
 - `make package-linux` (Docker), `make package-windows` (cross, pure Go), `make package-macos` (Mac only;
   never verified locally — CI `macos-14` job is the only check). Output in `dist/`.
 - Smoke-testing a release binary locally: always `env -u KUBECONFIG`, explicit

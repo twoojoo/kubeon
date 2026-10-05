@@ -71,6 +71,32 @@ launcher (Finder, Dock, app menu) it loads the login shell environment first, so
 exec credential plugins (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`, …) on your
 shell `PATH` work. `kubeon --version` prints the version.
 
+### Updates
+
+Release builds check GitHub releases daily (Preferences → Updates, or *Check
+now*). A newer version shows in the status bar; *Update now* downloads it,
+verifies it and replaces this copy in place, then restarts:
+
+| Installed as | Update |
+|---|---|
+| AppImage, `tar.gz` binary, portable Windows `kubeon.exe`, macOS `kubeon.app` | in place, when the location is writable |
+| `.deb` / `.rpm` (in `/usr`) | release page link: update with the package manager |
+
+Every download must match `SHA256SUMS.txt`, and that file must carry a valid
+ed25519 signature (`SHA256SUMS.txt.sig`) from the kubeon release key whose
+public half is built into the app (`internal/update`). Unsigned or foreign
+releases are never installed. CI signs releases with the secret
+`UPDATE_SIGNING_KEY` (`go run ./scripts/signsums keygen <file>` creates a key
+pair; keep the private key safe — losing it means existing installs can no
+longer update themselves). Dev builds never check for updates.
+`KUBEON_UPDATE_URL` points the check at another release endpoint.
+
+### Third-party licenses
+
+Every package ships `THIRD_PARTY_NOTICES.txt` (`make notices`): the license of
+each linked dependency, the vendored k9s (Apache-2.0) and Gio (Unlicense)
+with the list of kubeon's modifications, and the MPL-2.0 source note.
+
 ## Window chrome
 
 kubeon draws its own title bar (brand, namespace, centered command search,

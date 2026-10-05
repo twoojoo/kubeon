@@ -16,6 +16,8 @@ WINRES="github.com/tc-hib/go-winres@v0.3.3"
 # Windows version resources need a numeric a.b.c.d version
 NUMVER="$(num_version "$VERSION")"
 
+"$ROOT/scripts/notices.sh" "$DIST/THIRD_PARTY_NOTICES.txt"
+
 echo "==> resources ($VERSION / $NUMVER)"
 trap 'rm -f cmd/kubeon/rsrc_windows_*.syso' EXIT
 GOFLAGS=-mod=mod go run "$WINRES" make \
@@ -32,13 +34,13 @@ for arch in $ARCHES; do
   GOOS=windows GOARCH="$arch" CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -H windowsgui -X main.version=$VERSION" \
     -o "$OUT/kubeon.exe" ./cmd/kubeon
-  cp third_party/k9s/LICENSE "$OUT/LICENSE.k9s.txt"
+  cp "$DIST/THIRD_PARTY_NOTICES.txt" "$OUT/THIRD_PARTY_NOTICES.txt"
   ZIP="$ROOT/$DIST/kubeon-$VERSION-windows-$arch.zip"
   rm -f "$ZIP"
   if command -v zip >/dev/null; then
-    (cd "$OUT" && zip -q -9 "$ZIP" kubeon.exe LICENSE.k9s.txt)
+    (cd "$OUT" && zip -q -9 "$ZIP" kubeon.exe THIRD_PARTY_NOTICES.txt)
   else
-    (cd "$OUT" && python3 -m zipfile -c "$ZIP" kubeon.exe LICENSE.k9s.txt)
+    (cd "$OUT" && python3 -m zipfile -c "$ZIP" kubeon.exe THIRD_PARTY_NOTICES.txt)
   fi
 done
 ls -la "$DIST"/*.zip

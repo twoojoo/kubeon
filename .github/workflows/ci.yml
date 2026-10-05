@@ -90,6 +90,7 @@ jobs:
             dist/*.deb
             dist/*.rpm
             dist/*.tar.gz
+            dist/THIRD_PARTY_NOTICES.txt
 
   windows:
     name: package windows
@@ -185,6 +186,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: actions/download-artifact@v4
         with:
           pattern: kubeon-*
@@ -192,6 +197,19 @@ jobs:
           merge-multiple: true
       - name: checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # kubeon's self-updater installs only releases whose checksums verify
+      # with the public key built into the app (internal/update)
+      - name: sign checksums
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::error::secret UPDATE_SIGNING_KEY is missing: an unsigned release can't be installed by the updater"
+            exit 1
+          fi
+          go run ./scripts/signsums sign dist/SHA256SUMS.txt
+          pub="$(sed -n 's/^var PublicKey = "\(.*\)"/\1/p' internal/update/update.go)"
+          go run ./scripts/signsums verify "$pub" dist/SHA256SUMS.txt
       - name: publish
         env:
           GH_TOKEN: ${{ github.token }}

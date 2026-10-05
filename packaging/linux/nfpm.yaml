@@ -47,6 +47,8 @@ overrides:
 contents:
   - src: ${DIST}/linux-${ARCH}/kubeon
     dst: /usr/bin/kubeon
+  - src: ${DIST}/THIRD_PARTY_NOTICES.txt
+    dst: /usr/share/doc/kubeon/THIRD_PARTY_NOTICES.txt
   - src: packaging/linux/kubeon.desktop
     dst: /usr/share/applications/kubeon.desktop
   - src: packaging/linux/kubeon.metainfo.xml

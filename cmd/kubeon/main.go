@@ -14,6 +14,7 @@ import (
 	"github.com/giovanni/kubeon/internal/prefs"
 	"github.com/giovanni/kubeon/internal/safety"
 	"github.com/giovanni/kubeon/internal/ui"
+	"github.com/giovanni/kubeon/internal/update"
 )
 
 // version is set at build time (-ldflags "-X main.version=…").
@@ -37,6 +38,7 @@ func main() {
 		return
 	}
 	ui.Version = version
+	update.Cleanup() // leftovers of a previous self-update (Windows)
 
 	// desktop launchers start apps with a minimal environment; release
 	// builds load the login shell's (PATH for exec auth plugins, KUBECONFIG).

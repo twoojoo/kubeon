@@ -23,6 +23,7 @@ export MACOSX_DEPLOYMENT_TARGET=12.0 # Go 1.25 needs macOS 12+
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
+"$ROOT/scripts/notices.sh" "$DIST/THIRD_PARTY_NOTICES.txt"
 for arch in arm64 amd64; do
   carch=$arch; [[ $arch == amd64 ]] && carch=x86_64
   echo "==> go build darwin/$arch ($VERSION)"
@@ -40,7 +41,7 @@ lipo -info "$APP/Contents/MacOS/kubeon"
 sed -e "s/@VERSION@/$(num_version "$VERSION")/g" -e "s/@DISPLAY_VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
 cp packaging/icons/kubeon.icns "$APP/Contents/Resources/kubeon.icns"
-cp third_party/k9s/LICENSE "$APP/Contents/Resources/LICENSE.k9s"
+cp "$DIST/THIRD_PARTY_NOTICES.txt" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 "$APP/Contents/MacOS/kubeon" --version
 
 if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then

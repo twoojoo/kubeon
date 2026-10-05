@@ -46,6 +46,7 @@ type Prefs struct {
 	Contexts     map[string]ContextPolicy `json:"contexts,omitempty"`
 	PortForwards []PortForward            `json:"portForwards,omitempty"`
 	Bookmarks    []Bookmark               `json:"bookmarks,omitempty"`
+	CheckUpdates *bool                    `json:"checkUpdates,omitempty"` // nil = on
 
 	// LoadError reports a settings file that could not be parsed.
 	LoadError error `json:"-"`
@@ -111,6 +112,12 @@ func (p *Prefs) Protected(ctx string) bool {
 
 // ReadOnly reports whether ctx is read-only.
 func (p *Prefs) ReadOnly(ctx string) bool { return p.Contexts[ctx].ReadOnly }
+
+// UpdatesEnabled reports whether kubeon looks for new releases (default on).
+func (p *Prefs) UpdatesEnabled() bool { return p.CheckUpdates == nil || *p.CheckUpdates }
+
+// SetUpdates turns release checks on or off.
+func (p *Prefs) SetUpdates(on bool) { p.CheckUpdates = &on }
 
 // SetPolicy stores the policy of ctx.
 func (p *Prefs) SetPolicy(ctx string, protected, readOnly bool) {

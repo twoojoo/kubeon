@@ -13,6 +13,7 @@ type PrefsPanel struct {
 	done bool
 
 	darkBtn, lightBtn, protBtn, roBtn, pfBtn, closeBtn widget.Clickable
+	updAutoBtn, updNowBtn                              widget.Clickable
 	bmDel                                              map[string]*widget.Clickable
 	bmOpen                                             map[string]*widget.Clickable
 	list                                               widget.List
@@ -41,6 +42,17 @@ func (p *PrefsPanel) Layout(gtx C) D {
 		if err := a.prefs.Save(); err != nil {
 			a.flash("save preferences: "+err.Error(), true)
 		}
+	}
+	if p.updAutoBtn.Clicked(gtx) {
+		a.prefs.SetUpdates(!a.prefs.UpdatesEnabled())
+		save()
+		if a.prefs.UpdatesEnabled() {
+			a.checkUpdates(false)
+		}
+	}
+	if p.updNowBtn.Clicked(gtx) {
+		p.done = true
+		a.checkUpdates(true)
 	}
 	if p.darkBtn.Clicked(gtx) && a.prefs.Theme != "dark" {
 		a.toggleTheme()
@@ -141,6 +153,15 @@ func (p *PrefsPanel) Layout(gtx C) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						return toggle(gtx, th, &p.roBtn, "Read-only: block edits, deletes, scaling, shells and assistant actions (port-forwards stay allowed)", a.prefs.ReadOnly(ctx))
+					}),
+					section("UPDATES"),
+					layout.Rigid(func(gtx C) D {
+						return toggle(gtx, th, &p.updAutoBtn, "Check for new releases (daily, GitHub); updates are verified before installing", a.prefs.UpdatesEnabled())
+					}),
+					layout.Rigid(func(gtx C) D {
+						return layout.Inset{Top: 6}.Layout(gtx, func(gtx C) D {
+							return pillButton(gtx, th, &p.updNowBtn, icDownload, "Check now", pal.Text, pal.Hover)
+						})
 					}),
 					section("PORT-FORWARDS"),
 					layout.Rigid(func(gtx C) D {

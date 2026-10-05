@@ -17,6 +17,8 @@ DIST="${DIST:-dist}"
 IMAGE="kubeon-build-linux"
 
 if [[ "${1:-}" != "--inside" ]]; then
+  # needs network for license metadata: generated on the host
+  "$ROOT/scripts/notices.sh" "$DIST/THIRD_PARTY_NOTICES.txt"
   docker build -t "$IMAGE" packaging/linux
   # create the bind-mount sources first, or Docker makes them root-owned
   GOMOD="$(go env GOMODCACHE)"
@@ -48,7 +50,8 @@ CGO_ENABLED=1 go build -trimpath \
 
 echo "==> AppImage"
 APPDIR="$OUT/AppDir"
-mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/metainfo"
+mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/metainfo" "$APPDIR/usr/share/doc/kubeon"
+cp "$DIST/THIRD_PARTY_NOTICES.txt" "$APPDIR/usr/share/doc/kubeon/"
 cp "$OUT/kubeon" "$APPDIR/usr/bin/kubeon"
 cp packaging/linux/kubeon.desktop "$APPDIR/usr/share/applications/"
 cp packaging/linux/kubeon.desktop "$APPDIR/kubeon.desktop"
@@ -80,7 +83,7 @@ echo "==> tar.gz"
 TAR="kubeon-$VERSION-linux-$ARCH"
 mkdir -p "$OUT/$TAR"
 cp "$OUT/kubeon" packaging/linux/kubeon.desktop packaging/icons/kubeon-256.png "$OUT/$TAR/"
-cp third_party/k9s/LICENSE "$OUT/$TAR/LICENSE.k9s"
+cp "$DIST/THIRD_PARTY_NOTICES.txt" "$OUT/$TAR/"
 tar -C "$OUT" -czf "$DIST/$TAR.tar.gz" "$TAR"
 rm -rf "${OUT:?}/${TAR:?}"
 

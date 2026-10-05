@@ -82,6 +82,8 @@ type App struct {
 	ctxBtn  widget.Clickable
 	pfBtn   widget.Clickable
 	bellBtn widget.Clickable
+	updBtn  widget.Clickable
+	upd     updState
 
 	events       []backend.HealthEvent
 	unread       int
@@ -158,6 +160,7 @@ func (a *App) start() {
 	if err := a.prefs.LoadError; err != nil {
 		a.flash("Settings reset: "+err.Error(), true)
 	}
+	a.startUpdateChecks()
 	opts := a.opts
 	names, current, err := backend.Contexts(opts.Kubeconfig)
 	if err != nil {
@@ -580,6 +583,9 @@ func (a *App) layoutStatus(gtx C) D {
 	if a.bellBtn.Clicked(gtx) {
 		a.overlay = newNotifPanel(a)
 	}
+	if a.updBtn.Clicked(gtx) && a.upd.rel != nil {
+		a.overlay = newUpdateDialog(a)
+	}
 	return insetHV(10, 0).Layout(gtx, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(center(func(gtx C) D {
@@ -623,6 +629,24 @@ func (a *App) layoutStatus(gtx C) D {
 					})
 				}
 				return iconText(gtx, th, icStatusDone, 12, fg, a.status)
+			})),
+			layout.Rigid(center(func(gtx C) D {
+				if a.upd.rel == nil {
+					return D{}
+				}
+				txt := "Update " + a.upd.rel.Version
+				if a.upd.ready {
+					txt = "Restart to update"
+				}
+				return layout.Inset{Right: 12}.Layout(gtx, func(gtx C) D {
+					return a.updBtn.Layout(gtx, func(gtx C) D {
+						return rbg(gtx, withAlpha(rgb(0x000000), 0x30), 4, func(gtx C) D {
+							return insetHV(6, 2).Layout(gtx, func(gtx C) D {
+								return iconText(gtx, th, icDownload, 12, fg, txt)
+							})
+						})
+					})
+				})
 			})),
 			layout.Rigid(center(func(gtx C) D {
 				if a.cluster == nil {

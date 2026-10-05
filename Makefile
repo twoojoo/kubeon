@@ -12,7 +12,7 @@ DEV_TAGS := $(if $(GIO_TAGS),$(GIO_TAGS)$(comma))dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 
 .PHONY: build build-dev run test test-int dev-up dev-down vendor-k9s \
-	icons package-linux package-windows package-macos
+	icons notices package-linux package-windows package-macos
 
 build:
 	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w -X main.version=$(VERSION)' -o kubeon ./cmd/kubeon
@@ -46,6 +46,10 @@ vendor-k9s:
 # regenerate packaging/icons from scripts/icongen
 icons:
 	go run ./scripts/icongen -out packaging/icons
+
+# dist/THIRD_PARTY_NOTICES.txt (shipped in every package)
+notices:
+	./scripts/notices.sh
 
 # AppImage, .deb, .rpm, .tar.gz (built in Docker, full Wayland+X11+Vulkan)
 package-linux:
