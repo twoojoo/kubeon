@@ -78,6 +78,11 @@ sed -e "s|\${VERSION}|$(pkg_version "$VERSION")|g" -e "s|\${ARCH}|$ARCH|g" -e "s
 nfpm package --config "$OUT/nfpm.yaml" --packager deb --target "$DIST/"
 nfpm package --config "$OUT/nfpm.yaml" --packager rpm --target "$DIST/"
 rm "$OUT/nfpm.yaml"
+# "~" (prerelease ordering) belongs inside the package only: GitHub rewrites
+# it in asset names, which would no longer match SHA256SUMS.txt
+for f in "$DIST"/*'~'*; do
+  if [[ -e "$f" ]]; then mv "$f" "${f//\~/-}"; fi
+done
 
 echo "==> tar.gz"
 TAR="kubeon-$VERSION-linux-$ARCH"
