@@ -43,7 +43,7 @@ vendor-k9s:
 
 # ---- release packages (dist/) ----
 
-# regenerate packaging/icons from scripts/icongen
+# icons for every package + the UI logo, from packaging/logo-source.png
 icons:
 	go run ./scripts/icongen -out packaging/icons
 

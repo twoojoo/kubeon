@@ -517,18 +517,12 @@ func (a *App) layoutWelcome(gtx C) D {
 	return layout.Center.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical, Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
-				return rbg(gtx, withAlpha(pal.Accent, 0x30), 36, func(gtx C) D {
-					return inset(18).Layout(gtx, func(gtx C) D {
-						ic := icCluster
-						switch {
-						case a.connErr != nil:
-							ic = icCloudOff
-						case a.connecting != "":
-							ic = icRestart
-						}
-						return mdi(gtx, ic, pal.Accent, 40)
+				if a.connErr != nil {
+					return rbg(gtx, withAlpha(pal.Err, 0x30), 36, func(gtx C) D {
+						return inset(18).Layout(gtx, func(gtx C) D { return mdi(gtx, icCloudOff, pal.Err, 40) })
 					})
-				})
+				}
+				return drawLogo(gtx, 76)
 			}),
 			layout.Rigid(layout.Spacer{Height: 14}.Layout),
 			layout.Rigid(func(gtx C) D {

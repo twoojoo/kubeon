@@ -128,7 +128,7 @@ and build with `make build GIO_TAGS=`.
 Everything lands in `dist/`; the version comes from `git describe` (override with `VERSION=`).
 
 ```sh
-make icons            # regenerate packaging/icons (png/ico/icns) from scripts/icongen
+make icons            # packaging/icons (png/ico/icns) + internal/ui/assets/logo.png from packaging/logo-source.png
 make package-linux    # Docker (Ubuntu 22.04 + full Gio deps): AppImage, deb, rpm, tar.gz for the host arch
 make package-windows  # cross-compiled from any OS (pure Go): zips for amd64 + arm64, icon/manifest/version via go-winres
 make package-macos    # on a Mac: universal kubeon.app (arm64+amd64), dmg, zip

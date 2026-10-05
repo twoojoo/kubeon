@@ -1,6 +1,9 @@
-// Command icongen renders the kubeon app icon (the titlebar mark: a helm
-// wheel on an accent tile) into the PNG/ICO/ICNS files used by the
-// packages: go run ./scripts/icongen -out packaging/icons
+// Command icongen builds every icon file from the logo artwork
+// (packaging/logo-source.png, 1024×1024 RGBA): PNGs 16–1024 for Linux,
+// kubeon.ico (Windows) and kubeon.icns (macOS) in -out, and the tile-only
+// logo the UI draws in -ui.
+//
+//	go run ./scripts/icongen
 package main
 
 import (
@@ -9,113 +12,33 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"image/png"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 
-	"golang.org/x/image/vector"
+	"golang.org/x/image/draw"
 )
 
-var (
-	top    = color.NRGBA{0x4f, 0xa3, 0xe0, 0xff} // accent, lighter
-	bottom = color.NRGBA{0x2b, 0x6f, 0xad, 0xff} // accent, darker
-	white  = color.NRGBA{0xff, 0xff, 0xff, 0xff}
-)
-
-const k = 0.5523 // circle bezier factor
-
-func circle(z *vector.Rasterizer, cx, cy, r float32, ccw bool) {
-	if !ccw {
-		z.MoveTo(cx+r, cy)
-		z.CubeTo(cx+r, cy+r*k, cx+r*k, cy+r, cx, cy+r)
-		z.CubeTo(cx-r*k, cy+r, cx-r, cy+r*k, cx-r, cy)
-		z.CubeTo(cx-r, cy-r*k, cx-r*k, cy-r, cx, cy-r)
-		z.CubeTo(cx+r*k, cy-r, cx+r, cy-r*k, cx+r, cy)
-	} else {
-		z.MoveTo(cx+r, cy)
-		z.CubeTo(cx+r, cy-r*k, cx+r*k, cy-r, cx, cy-r)
-		z.CubeTo(cx-r*k, cy-r, cx-r, cy-r*k, cx-r, cy)
-		z.CubeTo(cx-r, cy+r*k, cx-r*k, cy+r, cx, cy+r)
-		z.CubeTo(cx+r*k, cy+r, cx+r, cy+r*k, cx+r, cy)
-	}
-	z.ClosePath()
+// resize scales src to size×size with a high-quality filter.
+func resize(src image.Image, size int) *image.NRGBA {
+	dst := image.NewNRGBA(image.Rect(0, 0, size, size))
+	draw.CatmullRom.Scale(dst, dst.Rect, src, src.Bounds(), draw.Src, nil)
+	return dst
 }
 
-func roundRect(z *vector.Rasterizer, x0, y0, x1, y1, r float32) {
-	z.MoveTo(x0+r, y0)
-	z.LineTo(x1-r, y0)
-	z.CubeTo(x1-r+r*k, y0, x1, y0+r-r*k, x1, y0+r)
-	z.LineTo(x1, y1-r)
-	z.CubeTo(x1, y1-r+r*k, x1-r+r*k, y1, x1-r, y1)
-	z.LineTo(x0+r, y1)
-	z.CubeTo(x0+r-r*k, y1, x0, y1-r+r*k, x0, y1-r)
-	z.LineTo(x0, y0+r)
-	z.CubeTo(x0, y0+r-r*k, x0+r-r*k, y0, x0+r, y0)
-	z.ClosePath()
-}
-
-// bar fills a line segment of width w with round caps.
-func bar(z *vector.Rasterizer, x0, y0, x1, y1, w float32) {
-	dx, dy := x1-x0, y1-y0
-	l := float32(math.Hypot(float64(dx), float64(dy)))
-	nx, ny := -dy/l*w/2, dx/l*w/2
-	z.MoveTo(x0+nx, y0+ny)
-	z.LineTo(x1+nx, y1+ny)
-	z.LineTo(x1-nx, y1-ny)
-	z.LineTo(x0-nx, y0-ny)
-	z.ClosePath()
-}
-
-func render(size int) *image.NRGBA {
-	s := float32(size)
-	img := image.NewNRGBA(image.Rect(0, 0, size, size))
-	// macOS-style safe area on large sizes, almost full bleed on tiny ones
-	m := s * 100 / 1024
-	if size <= 32 {
-		m = s / 32
-	}
-	tile := s - 2*m
-
-	grad := image.NewNRGBA(img.Rect)
-	for y := 0; y < size; y++ {
-		t := float32(y) / s
-		c := color.NRGBA{
-			uint8(float32(top.R)*(1-t) + float32(bottom.R)*t),
-			uint8(float32(top.G)*(1-t) + float32(bottom.G)*t),
-			uint8(float32(top.B)*(1-t) + float32(bottom.B)*t), 0xff,
-		}
-		for x := 0; x < size; x++ {
-			grad.SetNRGBA(x, y, c)
+// tileBounds is the opaque part of the artwork (the rounded tile).
+func tileBounds(img image.Image) image.Rectangle {
+	b := img.Bounds()
+	r := image.Rectangle{Min: b.Max, Max: b.Min}
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a > 0x8000 {
+				r = r.Union(image.Rect(x, y, x+1, y+1))
+			}
 		}
 	}
-	paint := func(src image.Image, build func(z *vector.Rasterizer)) {
-		z := vector.NewRasterizer(size, size)
-		z.DrawOp = draw.Over
-		build(z)
-		z.Draw(img, img.Rect, src, image.Point{})
-	}
-	paint(grad, func(z *vector.Rasterizer) { roundRect(z, m, m, s-m, s-m, tile*0.225) })
-
-	fg := image.NewUniform(white)
-	c := s / 2
-	r := tile * 0.28
-	sw := max(tile*0.075, 1.6)
-	paint(fg, func(z *vector.Rasterizer) { circle(z, c, c, r+sw/2, false); circle(z, c, c, r-sw/2, true) })
-	R := tile * 0.40
-	for _, a := range []float64{0, 45, 90, 135} {
-		dx, dy := float32(math.Cos(a*math.Pi/180))*R, float32(math.Sin(a*math.Pi/180))*R
-		paint(fg, func(z *vector.Rasterizer) { bar(z, c-dx, c-dy, c+dx, c+dy, sw) })
-		if size >= 48 { // handle knobs on the spoke ends
-			paint(fg, func(z *vector.Rasterizer) { circle(z, c-dx, c-dy, sw*0.9, false) })
-			paint(fg, func(z *vector.Rasterizer) { circle(z, c+dx, c+dy, sw*0.9, false) })
-		}
-	}
-	paint(fg, func(z *vector.Rasterizer) { circle(z, c, c, sw*1.1, false) })
-	return img
+	return r
 }
 
 func encode(img image.Image) []byte {
@@ -168,15 +91,28 @@ func writeICNS(path string, pngs map[int][]byte) error {
 }
 
 func main() {
+	src := flag.String("src", "packaging/logo-source.png", "1024×1024 logo artwork")
 	out := flag.String("out", "packaging/icons", "output directory")
+	ui := flag.String("ui", "internal/ui/assets", "UI assets directory")
 	flag.Parse()
-	if err := os.MkdirAll(*out, 0o755); err != nil {
+	f, err := os.Open(*src)
+	if err != nil {
 		log.Fatal(err)
+	}
+	art, err := png.Decode(f)
+	f.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, d := range []string{*out, *ui} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			log.Fatal(err)
+		}
 	}
 	sizes := []int{16, 24, 32, 48, 64, 128, 256, 512, 1024}
 	pngs := map[int][]byte{}
 	for _, s := range sizes {
-		pngs[s] = encode(render(s))
+		pngs[s] = encode(resize(art, s))
 		if err := os.WriteFile(filepath.Join(*out, fmt.Sprintf("kubeon-%d.png", s)), pngs[s], 0o644); err != nil {
 			log.Fatal(err)
 		}
@@ -185,6 +121,18 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := writeICNS(filepath.Join(*out, "kubeon.icns"), pngs); err != nil {
+		log.Fatal(err)
+	}
+	// UI: the tile without the transparent safe-area margin, sized for
+	// HiDPI title bars (24dp at up to ~4x) and the welcome screen
+	tile := image.NewNRGBA(image.Rect(0, 0, 0, 0))
+	if sub, ok := art.(interface {
+		SubImage(image.Rectangle) image.Image
+	}); ok {
+		t := sub.SubImage(tileBounds(art))
+		tile = resize(t, 256)
+	}
+	if err := os.WriteFile(filepath.Join(*ui, "logo.png"), encode(tile), 0o644); err != nil {
 		log.Fatal(err)
 	}
 }

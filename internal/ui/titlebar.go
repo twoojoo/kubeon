@@ -269,30 +269,8 @@ func keyChip(gtx C, th *material.Theme, k string) D {
 	})
 }
 
-// logo draws the kubeon mark: an accent tile with a stylized helm wheel.
-func (t *TitleBar) logo(gtx C) D {
-	s := gtx.Dp(24)
-	fillRRect(gtx, pal.Accent, image.Rect(0, 0, s, s), gtx.Dp(6))
-	c := f32.Pt(float32(s)/2, float32(s)/2)
-	r := float32(s) * 0.28
-	var p clip.Path
-	p.Begin(gtx.Ops)
-	// wheel rim
-	const k = 0.5523 // circle bezier factor
-	p.MoveTo(f32.Pt(c.X+r, c.Y))
-	p.CubeTo(f32.Pt(c.X+r, c.Y+r*k), f32.Pt(c.X+r*k, c.Y+r), f32.Pt(c.X, c.Y+r))
-	p.CubeTo(f32.Pt(c.X-r*k, c.Y+r), f32.Pt(c.X-r, c.Y+r*k), f32.Pt(c.X-r, c.Y))
-	p.CubeTo(f32.Pt(c.X-r, c.Y-r*k), f32.Pt(c.X-r*k, c.Y-r), f32.Pt(c.X, c.Y-r))
-	p.CubeTo(f32.Pt(c.X+r*k, c.Y-r), f32.Pt(c.X+r, c.Y-r*k), f32.Pt(c.X+r, c.Y))
-	// spokes
-	R := float32(s) * 0.40
-	for _, d := range []f32.Point{{X: 1, Y: 0}, {X: 0, Y: 1}, {X: 0.7071, Y: 0.7071}, {X: 0.7071, Y: -0.7071}} {
-		p.MoveTo(f32.Pt(c.X-d.X*R, c.Y-d.Y*R))
-		p.LineTo(f32.Pt(c.X+d.X*R, c.Y+d.Y*R))
-	}
-	paint.FillShape(gtx.Ops, pal.OnAccent, clip.Stroke{Path: p.End(), Width: float32(gtx.Dp(1.8))}.Op())
-	return D{Size: image.Pt(s, s)}
-}
+// logo draws the kubeon mark (the app icon tile).
+func (t *TitleBar) logo(gtx C) D { return drawLogo(gtx, 24) }
 
 type winGlyph int
 
