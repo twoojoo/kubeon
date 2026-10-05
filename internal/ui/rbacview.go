@@ -420,7 +420,9 @@ func (v *RBACView) layoutSubjects(gtx C) D {
 							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 								layout.Rigid(func(gtx C) D { return mdi(gtx, subjectIcon(s.Kind), pal.Accent, 15) }),
 								layout.Rigid(layout.Spacer{Width: 8}.Layout),
-								layout.Flexed(1, func(gtx C) D { return v.app.tipLbl(gtx, "rbac/sub/"+s.Key(), fontSans, 12.5, pal.TextBright, s.Display()) }),
+								layout.Flexed(1, func(gtx C) D {
+									return v.app.tipLbl(gtx, "rbac/sub/"+s.Key(), fontSans, 12.5, pal.TextBright, s.Display())
+								}),
 								layout.Rigid(func(gtx C) D {
 									return lbl(gtx, th, fontSans, 10.5, pal.TextDim, fmt.Sprintf("%s · %d", strings.ToLower(s.Kind), s.Bindings))
 								}),
@@ -520,8 +522,12 @@ func (v *RBACView) layoutRule(gtx C, i int, er backend.EffectiveRule) D {
 	}
 	return layout.Inset{Top: 5, Bottom: 5}.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Flexed(1.2, func(gtx C) D { return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/scope", i), fontSans, 12, pal.TextDim, scope) }),
-			layout.Flexed(1.6, func(gtx C) D { return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/verbs", i), fontMono, 11.5, verbC, verbs) }),
+			layout.Flexed(1.2, func(gtx C) D {
+				return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/scope", i), fontSans, 12, pal.TextDim, scope)
+			}),
+			layout.Flexed(1.6, func(gtx C) D {
+				return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/verbs", i), fontMono, 11.5, verbC, verbs)
+			}),
 			layout.Flexed(3, func(gtx C) D {
 				l := material.Body2(th, res)
 				l.Font, l.TextSize, l.Color, l.MaxLines = fontMono, 11.5, pal.Text, 3
