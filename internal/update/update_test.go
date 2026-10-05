@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -118,7 +119,7 @@ func TestInstallTarball(t *testing.T) {
 	if b, _ := os.ReadFile(target); string(b) != "NEW BINARY" || seen == 0 {
 		t.Fatalf("target %q progress %d", b, seen)
 	}
-	if st, _ := os.Stat(target); st.Mode().Perm()&0o100 == 0 {
+	if st, _ := os.Stat(target); runtime.GOOS != "windows" && st.Mode().Perm()&0o100 == 0 { // no exec bit on Windows
 		t.Fatal("not executable")
 	}
 }
