@@ -74,7 +74,7 @@ func (p *PrefsPanel) Layout(gtx C) D {
 	for _, b := range bms {
 		b := b
 		if clickOf(p.bmDel, b.Name).Clicked(gtx) {
-			a.prefs.RemoveBookmark(b.Name)
+			a.prefs.RemoveBookmark(b)
 			save()
 		}
 		if clickOf(p.bmOpen, b.Name).Clicked(gtx) {

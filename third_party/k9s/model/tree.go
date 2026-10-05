@@ -293,15 +293,12 @@ func treeHydrate(ctx context.Context, ns string, oo []runtime.Object, re TreeRen
 	if re == nil {
 		return fmt.Errorf("no tree renderer defined for this resource")
 	}
-	pool := internal.NewWorkerPool(ctx, internal.DefaultPoolSize)
+	// kubeon: renderers add children to the shared root node without locks;
+	// render sequentially instead of through a worker pool.
 	for _, o := range oo {
-		pool.Add(func(_ context.Context) error {
-			return re.Render(ctx, ns, o)
-		})
-	}
-	errs := pool.Drain()
-	if len(errs) > 0 {
-		return errs[0]
+		if err := re.Render(ctx, ns, o); err != nil {
+			return err
+		}
 	}
 
 	return nil

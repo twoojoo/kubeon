@@ -184,7 +184,7 @@ func TestXRay(t *testing.T) {
 func TestHealthEvents(t *testing.T) {
 	c := devCluster(t)
 	c.Watch("v1/pods", "", func(*Snapshot) {}).Close()
-	st := healthState{pods: map[string]string{}, nodes: map[string]bool{}, deps: map[string]bool{}}
+	st := healthState{pods: map[string]string{}, nodes: map[string]bool{}, deps: map[string]depState{}}
 	if ev := c.scanHealth(&st, false); len(ev) != 0 {
 		t.Fatal("seed must be silent")
 	}

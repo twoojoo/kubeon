@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"gioui.org/widget/material"
 
 	"github.com/giovanni/kubeon/internal/ai"
+	"github.com/giovanni/kubeon/internal/backend"
 )
 
 type chatKind int
@@ -42,6 +44,7 @@ type chatItem struct {
 	tool     *ai.ToolRun
 	running  bool
 	prop     *ai.Proposal
+	cluster  *backend.Cluster // where the proposal was made
 	state    int
 	result   string
 	expanded bool
@@ -71,6 +74,7 @@ type AIPanel struct {
 	input   widget.Editor
 	running bool
 	cancel  context.CancelFunc
+	runSeq  int      // events of older runs (stopped, new chat, other context) are dropped
 	notes   []string // results of approved actions, sent with the next message
 	attach  bool
 
@@ -106,6 +110,7 @@ func (p *AIPanel) reset() {
 	if p.cancel != nil {
 		p.cancel()
 	}
+	p.runSeq++
 	p.items, p.cur, p.agent, p.notes, p.running = nil, nil, nil, nil, false
 	p.attach = true
 }
@@ -175,9 +180,14 @@ func (p *AIPanel) send(text string) {
 	p.running = true
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancel = cancel
-	ag, ci := p.agent, p.contextInfo()
+	p.runSeq++
+	ag, ci, seq, c := p.agent, p.contextInfo(), p.runSeq, a.cluster
 	go ag.Run(ctx, ci, text, func(e ai.Event) {
-		a.post(func() { p.onEvent(e) })
+		a.post(func() {
+			if seq == p.runSeq && c == a.cluster {
+				p.onEvent(e)
+			}
+		})
 	})
 }
 
@@ -199,7 +209,7 @@ func (p *AIPanel) onEvent(e ai.Event) {
 			}
 			p.cur.dirty = true
 			if strings.TrimSpace(p.cur.text) == "" {
-				p.items = p.items[:len(p.items)-1]
+				p.items = slices.DeleteFunc(p.items, func(it *chatItem) bool { return it == p.cur })
 			}
 		}
 		p.cur = nil
@@ -213,12 +223,12 @@ func (p *AIPanel) onEvent(e ai.Event) {
 			}
 		}
 	case ai.EvProposal:
-		p.add(&chatItem{kind: chatProposal, prop: e.Proposal})
+		p.add(&chatItem{kind: chatProposal, prop: e.Proposal, cluster: p.app.cluster})
 	case ai.EvError:
-		p.running = false
+		p.running, p.cur = false, nil
 		p.add(&chatItem{kind: chatError, text: e.Err.Error()})
 	case ai.EvDone:
-		p.running = false
+		p.running, p.cur = false, nil // a stopped answer must not receive the next one
 	}
 	p.app.invalidate()
 }
@@ -227,12 +237,19 @@ func (p *AIPanel) stop() {
 	if p.cancel != nil {
 		p.cancel()
 	}
+	// input stays locked until the run reports EvDone: a new message must
+	// not start a second run on the same agent history
 }
 
 // execute runs an approved proposal through the regular backend actions.
 func (p *AIPanel) execute(it *chatItem) {
 	a, c, pr := p.app, p.app.cluster, it.prop
 	if c == nil {
+		return
+	}
+	if it.cluster != c { // never run a proposal on another cluster than proposed
+		it.state, it.result = propFailed, "context changed since the proposal"
+		a.flash("Proposal made for another context: not executed", true)
 		return
 	}
 	it.state = propRunning

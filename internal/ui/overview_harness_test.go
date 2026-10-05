@@ -31,7 +31,7 @@ func TestUIOverviewLinks(t *testing.T) {
 	if !ok {
 		t.Fatalf("warning %+v not linkable", w)
 	}
-	a.ovw.warnCl[0].Click()
+	a.ovw.warnCl[warnKey(&w)].Click()
 	h.frame()
 	h.frame()
 	if a.view.gvr != gvr || a.view.selID != path {

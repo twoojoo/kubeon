@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -114,8 +115,9 @@ func (a *Agent) Run(ctx context.Context, ci ContextInfo, user string, emit func(
 			emit(Event{Kind: EvError, Err: err})
 			return
 		}
-		if len(turn.Calls) == 0 {
+		if _, claude := a.Provider.(*Anthropic); len(turn.Calls) == 0 && !claude {
 			// small local models sometimes print the call instead of making it
+			// (never on Claude: a JSON example in an answer must stay text)
 			if calls := textToolCalls(turn.Text, specs); len(calls) > 0 {
 				turn.Calls, turn.Native, turn.Text = calls, nil, ""
 				turn.StopReason = "tool_use"
@@ -127,9 +129,10 @@ func (a *Agent) Run(ctx context.Context, ci ContextInfo, user string, emit func(
 		})
 		emit(Event{Kind: EvTurnEnd, Text: turn.Text})
 		if len(turn.Calls) == 0 || turn.StopReason == "max_tokens" || turn.StopReason == "refusal" {
-			if turn.StopReason == "max_tokens" && len(turn.Calls) > 0 {
-				// truncated tool call: report, do not execute
-				a.History = append(a.History, Message{Role: RoleTool, Results: errorResults(turn.Calls, "output truncated (max tokens); call not executed")})
+			// every tool call needs a result, or the provider rejects the
+			// whole conversation from the next request on
+			if len(turn.Calls) > 0 {
+				a.History = append(a.History, Message{Role: RoleTool, Results: errorResults(turn.Calls, "call not executed (turn ended: "+turn.StopReason+")")})
 			}
 			emit(Event{Kind: EvDone})
 			return
@@ -148,6 +151,8 @@ func (a *Agent) Run(ctx context.Context, ci ContextInfo, user string, emit func(
 			emit(Event{Kind: EvToolEnd, Tool: run})
 			results = append(results, ToolResult{CallID: call.ID, Name: call.Name, Content: out, IsError: run.IsError})
 			if ctx.Err() != nil {
+				// stopped: the remaining calls still need a result
+				results = append(results, errorResults(turn.Calls[len(results):], "cancelled by the user")...)
 				break
 			}
 		}
@@ -172,6 +177,12 @@ func (a *Agent) runTool(ctx context.Context, call ToolCall, emit func(Event)) (s
 	}
 	return a.Tools.Run(tctx, call)
 }
+
+var callSeq atomic.Uint64
+
+// newCallID returns a conversation-unique id for calls without one
+// (providers reject duplicate tool call ids in a history).
+func newCallID(prefix string) string { return fmt.Sprintf("%s_%d", prefix, callSeq.Add(1)) }
 
 func errorResults(calls []ToolCall, msg string) []ToolResult {
 	out := make([]ToolResult, 0, len(calls))
@@ -209,7 +220,7 @@ func textToolCalls(text string, specs []ToolSpec) []ToolCall {
 		known[s.Name] = true
 	}
 	var out []ToolCall
-	for i, m := range jsonObjRx.FindAllString(text, 4) {
+	for _, m := range jsonObjRx.FindAllString(text, 4) {
 		var v struct {
 			Name       string          `json:"name"`
 			Function   string          `json:"function"`
@@ -230,7 +241,7 @@ func textToolCalls(text string, specs []ToolSpec) []ToolCall {
 		if !known[name] || len(args) == 0 || strings.Contains(string(args), "<") {
 			continue
 		}
-		out = append(out, ToolCall{ID: fmt.Sprintf("text_call_%d", i), Name: name, Args: args})
+		out = append(out, ToolCall{ID: newCallID("text_call"), Name: name, Args: args})
 	}
 	return out
 }

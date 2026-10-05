@@ -18,14 +18,15 @@ const rbacPage = "rbac-explorer"
 // RBACView explores subjects, their effective permissions, can-i checks and
 // reverse "who can" queries.
 type RBACView struct {
-	app    *App
-	idx    *backend.RBACIndex
-	sel    int
-	who    bool // reverse query mode
-	filter widget.Editor
-	verb   widget.Editor
-	res    widget.Editor
-	ns     widget.Editor
+	app             *App
+	idx             *backend.RBACIndex
+	sel             int
+	who             bool // reverse query mode
+	filter          widget.Editor
+	loadSeq, sarSeq int
+	verb            widget.Editor
+	res             widget.Editor
+	ns              widget.Editor
 
 	subList, ruleList widget.List
 	subBtns           map[string]*widget.Clickable
@@ -56,12 +57,25 @@ func newRBACView(a *App) *RBACView {
 func (v *RBACView) open(ns string) {
 	v.ns.SetText(ns)
 	c := v.app.cluster
+	v.loadSeq++
+	seq := v.loadSeq
 	go func() {
 		idx := c.RBAC()
 		v.app.post(func() {
-			v.idx = idx
-			if v.sel >= len(idx.Subjects) {
-				v.sel = -1
+			if seq != v.loadSeq || c != v.app.cluster {
+				return // superseded, or another context by now
+			}
+			// keep the selected subject (by identity, indexes shift)
+			var prev *backend.Subject
+			if v.idx != nil && v.sel >= 0 && v.sel < len(v.idx.Subjects) {
+				p := v.idx.Subjects[v.sel]
+				prev = &p
+			}
+			v.idx, v.sel, v.sar = idx, -1, ""
+			for i, s := range idx.Subjects {
+				if prev != nil && s == *prev {
+					v.sel = i
+				}
 			}
 			v.refreshRules()
 		})
@@ -130,9 +144,14 @@ func (v *RBACView) check() {
 	v.localOK, v.localRules = v.idx.Check(s, q)
 	v.sar = "…"
 	c := v.app.cluster
+	v.sarSeq++
+	seq := v.sarSeq
 	go func() {
 		allowed, reason, err := c.AccessReview(s, q)
 		v.app.post(func() {
+			if seq != v.sarSeq { // a newer check (or subject) replaced it
+				return
+			}
 			switch {
 			case err != nil:
 				v.sar = "error: " + err.Error()
@@ -253,6 +272,16 @@ func (v *RBACView) Layout(gtx C) D {
 	)
 }
 
+// focused reports whether one of the page's text fields has focus.
+func (v *RBACView) focused(gtx C) bool {
+	for _, e := range []*widget.Editor{&v.filter, &v.verb, &v.res, &v.ns} {
+		if gtx.Focused(e) {
+			return true
+		}
+	}
+	return false
+}
+
 func (v *RBACView) editor(gtx C, e *widget.Editor, label, hint string, w int) D {
 	th := v.app.th
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
@@ -368,6 +397,8 @@ func (v *RBACView) layoutSubjects(gtx C) D {
 				cl := v.click(v.subBtns, s.Key())
 				if cl.Clicked(gtx) {
 					v.sel = ids[i]
+					v.sarSeq++ // a pending review is about the previous subject
+					v.sar = ""
 					v.refreshRules()
 					if v.who {
 						v.who, v.checked = false, false

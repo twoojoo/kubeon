@@ -101,6 +101,7 @@ type TableWatch struct {
 	seq     atomic.Uint64
 	pending atomic.Bool
 	kick    chan struct{}
+	failed  chan struct{} // the k9s updater gave up
 	started time.Time
 	closed  atomic.Bool
 }
@@ -138,6 +139,7 @@ func (c *Cluster) WatchPath(gvr, ns, path string, onSnap func(*Snapshot)) *Table
 		colorer: colorer,
 		sortAsc: true,
 		kick:    make(chan struct{}, 1),
+		failed:  make(chan struct{}, 1),
 		started: time.Now(),
 	}
 	tw.mt.SetNamespace(ns)
@@ -149,12 +151,7 @@ func (c *Cluster) WatchPath(gvr, ns, path string, onSnap func(*Snapshot)) *Table
 	tw.cancel = cancel
 	go tw.publisher(ctx)
 	tw.publish(&Snapshot{GVR: gvr, Namespace: ns, Loading: true})
-	go func() {
-		wctx := c.baseContext(ctx, g, ns, path)
-		if err := tw.mt.Watch(wctx); err != nil {
-			tw.TableLoadFailed(err)
-		}
-	}()
+	go tw.supervise(ctx, c.baseContext(ctx, g, ns, path))
 
 	return &tw
 }
@@ -231,10 +228,45 @@ func (t *TableWatch) TableDataChanged(data *model1.TableData) {
 
 // TableLoadFailed implements model.TableListener.
 func (t *TableWatch) TableLoadFailed(err error) {
+	t.setErr(err)
+	// k9s' updater gives up after failing for a while: let supervise restart it
+	select {
+	case t.failed <- struct{}{}:
+	default:
+	}
+}
+
+func (t *TableWatch) setErr(err error) {
 	t.mx.Lock()
 	t.lastErr = err
 	t.mx.Unlock()
 	t.trigger()
+}
+
+// supervise runs the k9s table watch and restarts it (with back-off) when
+// the initial load fails or its updater gives up (API errors, sleep, VPN
+// drops), for as long as the view is open.
+func (t *TableWatch) supervise(ctx, wctx context.Context) {
+	const maxDelay = 30 * time.Second
+	delay := time.Second
+	for {
+		if err := t.mt.Watch(wctx); err != nil {
+			t.setErr(err)
+		} else {
+			delay = time.Second
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.failed:
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay = min(2*delay, maxDelay)
+	}
 }
 
 func (t *TableWatch) trigger() {

@@ -66,3 +66,24 @@ func TestMigrateLegacyDirs(t *testing.T) {
 		t.Fatal("log not migrated")
 	}
 }
+
+func TestBrokenSettingsQuarantined(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("KUBEON_CONFIG_DIR", dir)
+	path := filepath.Join(dir, "settings.json")
+	_ = os.WriteFile(path, []byte(`{"contexts": {"prod": {"readOnly": tru`), 0o600)
+	p := Load()
+	if p.LoadError == nil {
+		t.Fatal("expected a load error")
+	}
+	if err := p.Save(); err != nil {
+		t.Fatal(err)
+	}
+	m, _ := filepath.Glob(path + ".broken-*")
+	if len(m) != 1 {
+		t.Fatalf("broken file not kept: %v", m)
+	}
+	if st, _ := os.Stat(path); st.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v", st.Mode())
+	}
+}

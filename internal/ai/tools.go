@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/duration"
+	"sigs.k8s.io/yaml"
 
 	"github.com/giovanni/kubeon/internal/backend"
 )
@@ -199,6 +200,10 @@ func (t *Tools) Run(ctx context.Context, call ToolCall) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// Helm releases embed the rendered manifest, Secrets included
+		if head, manifest, ok := strings.Cut(d, "\nMANIFEST:\n"); ok {
+			return clip(RedactText(head) + "\nMANIFEST:\n" + RedactManifest("", manifest)), nil
+		}
 		return clip(RedactText(d)), nil
 
 	case "get_events":
@@ -252,11 +257,12 @@ func (t *Tools) Run(ctx context.Context, call ToolCall) (string, error) {
 		if n == 0 {
 			return "no log lines", nil
 		}
-		out := b.String()
+		// redact before cutting: a cut PEM block would escape the rule
+		out := RedactText(b.String())
 		if len(out) > maxToolOutput { // keep the most recent lines
 			out = "…[older lines truncated]\n" + out[len(out)-maxToolOutput:]
 		}
-		return RedactText(out), nil
+		return out, nil
 
 	case "xray":
 		gvr, err := resolveKind(a.Kind)
@@ -334,9 +340,11 @@ func (t *Tools) Run(ctx context.Context, call ToolCall) (string, error) {
 				return "", fmt.Errorf("scale needs replicas")
 			}
 		case "apply":
-			if strings.TrimSpace(p.Manifest) == "" {
-				return "", fmt.Errorf("apply needs the full manifest")
+			m, err := checkApplyManifest(&p)
+			if err != nil {
+				return "", err
 			}
+			p.Manifest = m
 		case "restart", "delete", "cordon", "uncordon":
 		default:
 			return "", fmt.Errorf("unsupported action %q", p.Action)
@@ -432,4 +440,56 @@ func findXPrefix(n *backend.XNode, name string) *backend.XNode {
 		}
 	}
 	return nil
+}
+
+// checkApplyManifest makes sure an apply proposal changes exactly the object
+// it names (the card, the confirmation and the diff all use Kind/Name/
+// Namespace) and doesn't write redaction placeholders back to the cluster.
+// A missing namespace is filled in for namespaced kinds.
+func checkApplyManifest(p *Proposal) (string, error) {
+	if strings.TrimSpace(p.Manifest) == "" {
+		return "", fmt.Errorf("apply needs the full manifest")
+	}
+	if strings.Contains(p.Manifest, redacted) {
+		return "", fmt.Errorf("the manifest contains %s placeholders: they would overwrite the real values. "+
+			"Omit those fields or ask the user for the values", redacted)
+	}
+	if len(docSep.Split(strings.TrimSpace(p.Manifest), -1)) > 1 {
+		return "", fmt.Errorf("apply takes a single object: propose one apply per object")
+	}
+	var obj map[string]any
+	if err := yaml.Unmarshal([]byte(p.Manifest), &obj); err != nil || obj == nil {
+		return "", fmt.Errorf("invalid manifest: %v", err)
+	}
+	md, _ := obj["metadata"].(map[string]any)
+	if md == nil {
+		return "", fmt.Errorf("manifest has no metadata")
+	}
+	if name := str(md["name"]); name != p.Name {
+		return "", fmt.Errorf("manifest name %q differs from the proposal name %q", name, p.Name)
+	}
+	kind := str(obj["kind"])
+	gvr, err := resolveKind(kind)
+	if err != nil { // registry not loaded: Kind → plural resource of the GVR
+		gvr = p.GVR
+		if !strings.HasSuffix(p.GVR, "/"+strings.ToLower(kind)+"s") {
+			gvr = ""
+		}
+	}
+	if kind == "" || gvr != p.GVR {
+		return "", fmt.Errorf("manifest kind %q differs from the proposal kind %q", str(obj["kind"]), p.Kind)
+	}
+	if backend.IsNamespaced(p.GVR) {
+		switch ns := str(md["namespace"]); {
+		case ns == "":
+			md["namespace"] = p.Namespace
+		case ns != p.Namespace:
+			return "", fmt.Errorf("manifest namespace %q differs from the proposal namespace %q", ns, p.Namespace)
+		}
+	}
+	b, err := yaml.Marshal(obj)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

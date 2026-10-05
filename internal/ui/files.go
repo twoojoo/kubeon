@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,4 +41,32 @@ func downloadsDir() string {
 func dirExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()
+}
+
+// saveNew writes data to a new file in the downloads directory with mode
+// 0600 (logs and secrets may hold credentials), never overwriting: name
+// collisions get a numeric suffix. Returns the path written.
+func saveNew(name string, data []byte) (string, error) {
+	dir := downloadsDir()
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	for i := 0; i < 1000; i++ {
+		p := filepath.Join(dir, name)
+		if i > 0 {
+			p = filepath.Join(dir, fmt.Sprintf("%s (%d)%s", base, i, ext))
+		}
+		f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if os.IsExist(err) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if _, err := f.Write(data); err != nil {
+			f.Close()
+			return "", err
+		}
+		return p, f.Close()
+	}
+	return "", fmt.Errorf("too many files named %s", name)
 }

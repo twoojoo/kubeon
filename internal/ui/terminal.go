@@ -134,7 +134,9 @@ func (t *Terminal) handleInput(gtx C) {
 	for c := 'A'; c <= 'Z'; c++ {
 		filters = append(filters, key.Filter{Focus: &t.tag, Name: key.Name(string(c)), Required: key.ModCtrl})
 	}
+	t.vt.Lock() // the output goroutine updates the state under this lock
 	appCursor := t.vt.Mode()&vt10x.ModeAppCursor != 0
+	t.vt.Unlock()
 	for {
 		ev, ok := gtx.Event(filters...)
 		if !ok {

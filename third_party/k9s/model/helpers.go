@@ -6,6 +6,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"time"
 
@@ -40,8 +41,40 @@ func resourceMeta(gvr *client.GVR) ResourceMeta {
 	if meta.DAO == nil {
 		meta.DAO = new(dao.Resource)
 	}
+	// kubeon: Registry entries are shared; DAO.Init and
+	// Renderer.SetViewSetting mutate them, so concurrent tables on the same
+	// GVR race. Hand out private copies.
+	meta.DAO = cloneZero(meta.DAO)
+	meta.Renderer = cloneZero(meta.Renderer)
+	if meta.TreeRenderer != nil {
+		meta.TreeRenderer = cloneZero(meta.TreeRenderer)
+	}
 
 	return meta
+}
+
+// cloneZero returns a fresh instance of v's concrete type: value fields are
+// copied, non-nil pointer fields (e.g. an embedded *render.Base) are replaced
+// by new zero values so no mutable state is shared.
+func cloneZero[T any](v T) T {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
+		return v
+	}
+	src := rv.Elem()
+	dst := reflect.New(src.Type())
+	dst.Elem().Set(src)
+	for i := 0; i < src.NumField(); i++ {
+		f := dst.Elem().Field(i)
+		if f.Kind() == reflect.Pointer && !f.IsNil() && f.CanSet() && f.Type().Elem().Kind() == reflect.Struct {
+			f.Set(reflect.New(f.Type().Elem()))
+		}
+	}
+	out, ok := dst.Interface().(T)
+	if !ok {
+		return v
+	}
+	return out
 }
 
 // MetaFQN returns a fully qualified resource name.

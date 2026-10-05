@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -288,8 +286,8 @@ func (l *LogView) export() string {
 
 func (l *LogView) download() {
 	name := fmt.Sprintf("%s-%s.log", strings.ReplaceAll(l.path, "/", "_"), time.Now().Format("20060102-150405"))
-	p := filepath.Join(downloadsDir(), name)
-	if err := os.WriteFile(p, []byte(l.export()), 0o644); err != nil {
+	p, err := saveNew(name, []byte(l.export()))
+	if err != nil {
 		l.app.flash("download failed: "+err.Error(), true)
 		return
 	}

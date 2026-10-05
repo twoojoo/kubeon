@@ -22,13 +22,14 @@ const overviewGVR = "overview"
 
 // OverviewView is the Lens-like cluster dashboard.
 type OverviewView struct {
-	app    *App
-	data   *backend.Overview
-	cancel context.CancelFunc
-	list   widget.List
-	ns     string
-	cards4 [4]widget.Clickable
-	warnCl []widget.Clickable
+	app     *App
+	data    *backend.Overview
+	cancel  context.CancelFunc
+	list    widget.List
+	ns      string
+	cluster *backend.Cluster // the data's cluster
+	cards4  [4]widget.Clickable
+	warnCl  map[string]*widget.Clickable // by warning identity: rows reorder on refresh
 }
 
 func newOverview(a *App) *OverviewView {
@@ -39,6 +40,9 @@ func newOverview(a *App) *OverviewView {
 
 func (o *OverviewView) open(ns string) {
 	o.close()
+	if c := o.app.cluster; o.ns != ns || o.cluster != c {
+		o.data, o.cluster = nil, c // no numbers of another namespace/cluster
+	}
 	o.ns = ns
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
@@ -345,12 +349,19 @@ func warningTarget(w *backend.EventInfo) (string, string, bool) {
 	return gvr, name, true
 }
 
+func warnKey(w *backend.EventInfo) string { return w.Namespace + "|" + w.Object + "|" + w.Reason }
+
 func (o *OverviewView) warning(gtx C, i int, w *backend.EventInfo) D {
 	th := o.app.th
-	if len(o.warnCl) <= i {
-		o.warnCl = append(o.warnCl, make([]widget.Clickable, i+1-len(o.warnCl))...)
+	if o.warnCl == nil {
+		o.warnCl = map[string]*widget.Clickable{}
 	}
-	cl := &o.warnCl[i]
+	k := warnKey(w)
+	cl := o.warnCl[k]
+	if cl == nil {
+		cl = new(widget.Clickable)
+		o.warnCl[k] = cl
+	}
 	gvr, path, linkable := warningTarget(w)
 	if linkable && cl.Clicked(gtx) {
 		o.app.goTo(gvr, path)

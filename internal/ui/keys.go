@@ -64,6 +64,10 @@ func (a *App) onKey(gtx C, e key.Event, nav bool) {
 	switch {
 	case e.Name == key.NameEscape:
 		a.escape(gtx)
+	case a.overlay != nil:
+		// a dialog is open: nothing may change the state it acts on
+		// (switching or closing tabs under a confirmation or a diff review)
+		return
 	case e.Modifiers.Contain(key.ModShortcut) && e.Name == "K",
 		e.Modifiers.Contain(key.ModShortcut) && e.Name == "P":
 		a.openPalette("")

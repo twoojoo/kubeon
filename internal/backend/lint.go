@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -117,7 +118,7 @@ func (c *Cluster) Lint(ns string) *LintReport {
 	for _, x := range secs {
 		secSet[x.Namespace+"/"+x.Name] = true
 	}
-	usedCM, usedSec, usedPVC := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	refs := specRefs{cmSet: cmSet, secSet: secSet, cm: map[string]bool{}, sec: map[string]bool{}, pvc: map[string]bool{}}
 
 	// ---- pods ----
 	l.scanned["Pods"] = len(pods)
@@ -184,67 +185,34 @@ func (c *Cluster) Lint(ns string) *LintReport {
 			}
 			_ = cpath
 		}
-		// references
+		refs.scan(p.Namespace, &p.Spec, func(msg string, args ...any) {
+			l.add(SevErr, "Pods", "REF-MISSING", gvr, path, msg, args...)
+		})
 		for _, v := range p.Spec.Volumes {
-			switch {
-			case v.ConfigMap != nil:
-				k := p.Namespace + "/" + v.ConfigMap.Name
-				usedCM[k] = true
-				if !cmSet[k] && (v.ConfigMap.Optional == nil || !*v.ConfigMap.Optional) {
-					l.add(SevErr, "Config", "REF-MISSING", gvr, path, "volume %s references missing configmap %s", v.Name, v.ConfigMap.Name)
-				}
-			case v.Secret != nil:
-				k := p.Namespace + "/" + v.Secret.SecretName
-				usedSec[k] = true
-				if !secSet[k] && (v.Secret.Optional == nil || !*v.Secret.Optional) {
-					l.add(SevErr, "Config", "REF-MISSING", gvr, path, "volume %s references missing secret %s", v.Name, v.Secret.SecretName)
-				}
-			case v.PersistentVolumeClaim != nil:
-				usedPVC[p.Namespace+"/"+v.PersistentVolumeClaim.ClaimName] = true
-			case v.Projected != nil:
-				for _, s := range v.Projected.Sources {
-					if s.ConfigMap != nil {
-						usedCM[p.Namespace+"/"+s.ConfigMap.Name] = true
-					}
-					if s.Secret != nil {
-						usedSec[p.Namespace+"/"+s.Secret.Name] = true
-					}
-				}
-			}
-		}
-		for _, s := range p.Spec.ImagePullSecrets {
-			usedSec[p.Namespace+"/"+s.Name] = true
-		}
-		for _, co := range append(append([]v1.Container{}, p.Spec.InitContainers...), p.Spec.Containers...) {
-			for _, e := range co.Env {
-				if e.ValueFrom == nil {
-					continue
-				}
-				if r := e.ValueFrom.ConfigMapKeyRef; r != nil {
-					k := p.Namespace + "/" + r.Name
-					usedCM[k] = true
-					if !cmSet[k] && (r.Optional == nil || !*r.Optional) {
-						l.add(SevErr, "Config", "REF-MISSING", gvr, path, "env %s references missing configmap %s", e.Name, r.Name)
-					}
-				}
-				if r := e.ValueFrom.SecretKeyRef; r != nil {
-					k := p.Namespace + "/" + r.Name
-					usedSec[k] = true
-					if !secSet[k] && (r.Optional == nil || !*r.Optional) {
-						l.add(SevErr, "Config", "REF-MISSING", gvr, path, "env %s references missing secret %s", e.Name, r.Name)
-					}
-				}
-			}
-			for _, ef := range co.EnvFrom {
-				if ef.ConfigMapRef != nil {
-					usedCM[p.Namespace+"/"+ef.ConfigMapRef.Name] = true
-				}
-				if ef.SecretRef != nil {
-					usedSec[p.Namespace+"/"+ef.SecretRef.Name] = true
-				}
+			if v.Ephemeral != nil { // generic ephemeral volume: PVC <pod>-<volume>
+				refs.pvc[p.Namespace+"/"+p.Name+"-"+v.Name] = true
 			}
 		}
 	}
+	// pod templates count as usage too (scaled to 0, CronJobs between runs)
+	for _, d := range deps {
+		refs.scan(d.Namespace, &d.Spec.Template.Spec, nil)
+	}
+	for _, x := range stss {
+		refs.scan(x.Namespace, &x.Spec.Template.Spec, nil)
+	}
+	for _, x := range listTyped[appsv1.DaemonSet](c, client.DsGVR, pns) {
+		refs.scan(x.Namespace, &x.Spec.Template.Spec, nil)
+	}
+	for _, x := range listTyped[batchv1.CronJob](c, client.CjGVR, pns) {
+		refs.scan(x.Namespace, &x.Spec.JobTemplate.Spec.Template.Spec, nil)
+	}
+	for _, in := range ings {
+		for _, t := range in.Spec.TLS {
+			refs.sec[in.Namespace+"/"+t.SecretName] = true
+		}
+	}
+	usedCM, usedSec, usedPVC := refs.cm, refs.sec, refs.pvc
 
 	// ---- workloads ----
 	l.scanned["Workloads"] = len(deps) + len(stss)
@@ -293,7 +261,8 @@ func (c *Cluster) Lint(ns string) *LintReport {
 			name := sp.TargetPort.StrVal
 			found := false
 			for _, p := range matched {
-				for _, co := range p.Spec.Containers {
+				// init containers too: native sidecars (restartPolicy Always) serve ports
+				for _, co := range append(append([]v1.Container{}, p.Spec.InitContainers...), p.Spec.Containers...) {
 					for _, cp := range co.Ports {
 						if cp.Name == name {
 							found = true
@@ -315,14 +284,17 @@ func (c *Cluster) Lint(ns string) *LintReport {
 	l.scanned["Ingresses"] = len(ings)
 	for _, in := range ings {
 		path := in.Namespace + "/" + in.Name
+		backends := []*netv1.IngressBackend{in.Spec.DefaultBackend}
 		for _, r := range in.Spec.Rules {
-			if r.HTTP == nil {
-				continue
-			}
-			for _, p := range r.HTTP.Paths {
-				if p.Backend.Service != nil && !svcSet[in.Namespace+"/"+p.Backend.Service.Name] {
-					l.add(SevErr, "Ingresses", "ING-NOSVC", "networking.k8s.io/v1/ingresses", path, "backend service %s does not exist", p.Backend.Service.Name)
+			if r.HTTP != nil {
+				for i := range r.HTTP.Paths {
+					backends = append(backends, &r.HTTP.Paths[i].Backend)
 				}
+			}
+		}
+		for _, b := range backends {
+			if b != nil && b.Service != nil && !svcSet[in.Namespace+"/"+b.Service.Name] {
+				l.add(SevErr, "Ingresses", "ING-NOSVC", "networking.k8s.io/v1/ingresses", path, "backend service %s does not exist", b.Service.Name)
 			}
 		}
 	}
@@ -334,7 +306,7 @@ func (c *Cluster) Lint(ns string) *LintReport {
 		if usedCM[k] || systemNS[x.Namespace] || x.Name == "kube-root-ca.crt" {
 			continue
 		}
-		l.add(SevInfo, "Config", "CM-UNUSED", "v1/configmaps", k, "not referenced by any pod")
+		l.add(SevInfo, "Config", "CM-UNUSED", "v1/configmaps", k, "not referenced by any pod or workload")
 	}
 	for _, x := range secs {
 		k := x.Namespace + "/" + x.Name
@@ -342,7 +314,7 @@ func (c *Cluster) Lint(ns string) *LintReport {
 			strings.HasPrefix(string(x.Type), "helm.sh/") || x.Type == v1.SecretTypeTLS {
 			continue
 		}
-		l.add(SevInfo, "Config", "SEC-UNUSED", "v1/secrets", k, "not referenced by any pod")
+		l.add(SevInfo, "Config", "SEC-UNUSED", "v1/secrets", k, "not referenced by any pod or workload")
 	}
 
 	// ---- storage ----
@@ -375,6 +347,76 @@ func (c *Cluster) Lint(ns string) *LintReport {
 	l.scanned["Security"] = len(pods)
 
 	return l.report(ns)
+}
+
+// specRefs collects configmaps/secrets/PVCs referenced by pod specs.
+type specRefs struct {
+	cmSet, secSet map[string]bool // existing objects
+	cm, sec, pvc  map[string]bool // referenced
+}
+
+// scan marks the references of spec; missing (non-optional) ones are
+// reported through missing when it is not nil.
+func (r *specRefs) scan(ns string, spec *v1.PodSpec, missing func(msg string, args ...any)) {
+	isOpt := func(o *bool) bool { return o != nil && *o }
+	cm := func(name string, optional *bool, what string) {
+		k := ns + "/" + name
+		r.cm[k] = true
+		if missing != nil && !r.cmSet[k] && !isOpt(optional) {
+			missing("%s references missing configmap %s", what, name)
+		}
+	}
+	sec := func(name string, optional *bool, what string) {
+		k := ns + "/" + name
+		r.sec[k] = true
+		if missing != nil && !r.secSet[k] && !isOpt(optional) {
+			missing("%s references missing secret %s", what, name)
+		}
+	}
+	for _, v := range spec.Volumes {
+		what := "volume " + v.Name
+		switch {
+		case v.ConfigMap != nil:
+			cm(v.ConfigMap.Name, v.ConfigMap.Optional, what)
+		case v.Secret != nil:
+			sec(v.Secret.SecretName, v.Secret.Optional, what)
+		case v.PersistentVolumeClaim != nil:
+			r.pvc[ns+"/"+v.PersistentVolumeClaim.ClaimName] = true
+		case v.Projected != nil:
+			for _, src := range v.Projected.Sources {
+				if src.ConfigMap != nil {
+					cm(src.ConfigMap.Name, src.ConfigMap.Optional, what)
+				}
+				if src.Secret != nil {
+					sec(src.Secret.Name, src.Secret.Optional, what)
+				}
+			}
+		}
+	}
+	for _, s := range spec.ImagePullSecrets {
+		r.sec[ns+"/"+s.Name] = true
+	}
+	for _, co := range append(append([]v1.Container{}, spec.InitContainers...), spec.Containers...) {
+		for _, e := range co.Env {
+			if e.ValueFrom == nil {
+				continue
+			}
+			if ref := e.ValueFrom.ConfigMapKeyRef; ref != nil {
+				cm(ref.Name, ref.Optional, "env "+e.Name)
+			}
+			if ref := e.ValueFrom.SecretKeyRef; ref != nil {
+				sec(ref.Name, ref.Optional, "env "+e.Name)
+			}
+		}
+		for _, ef := range co.EnvFrom {
+			if ef.ConfigMapRef != nil {
+				cm(ef.ConfigMapRef.Name, ef.ConfigMapRef.Optional, "envFrom of "+co.Name)
+			}
+			if ef.SecretRef != nil {
+				sec(ef.SecretRef.Name, ef.SecretRef.Optional, "envFrom of "+co.Name)
+			}
+		}
+	}
 }
 
 func (l *linter) report(ns string) *LintReport {

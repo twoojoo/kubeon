@@ -1,0 +1,96 @@
+diff --git a/dao/pod.go b/dao/pod.go
+index 3c5d21a..00edc20 100644
+--- a/dao/pod.go
++++ b/dao/pod.go
+@@ -231,6 +231,11 @@ func (p *Pod) TailLogs(ctx context.Context, opts *LogOptions) ([]LogChan, error)
+ 	outs := make([]LogChan, 0, coCounts)
+ 	if co, ok := GetDefaultContainer(&po.ObjectMeta, &po.Spec); ok && !opts.AllContainers {
+ 		opts.DefaultContainer = co
++		// kubeon: the log request needs the container name; k9s' view sets
++		// it, other callers leave it empty and the API server rejects them.
++		if opts.Container == "" {
++			opts.Container = co
++		}
+ 		return append(outs, tailLogs(ctx, p, opts)), nil
+ 	}
+ 	if opts.HasContainer() && !opts.AllContainers {
+diff --git a/model/helpers.go b/model/helpers.go
+index 5884e13..ad2d50c 100644
+--- a/model/helpers.go
++++ b/model/helpers.go
+@@ -6,6 +6,7 @@ package model
+ import (
+ 	"context"
+ 	"fmt"
++	"reflect"
+ 	"regexp"
+ 	"time"
+ 
+@@ -40,10 +41,42 @@ func resourceMeta(gvr *client.GVR) ResourceMeta {
+ 	if meta.DAO == nil {
+ 		meta.DAO = new(dao.Resource)
+ 	}
++	// kubeon: Registry entries are shared; DAO.Init and
++	// Renderer.SetViewSetting mutate them, so concurrent tables on the same
++	// GVR race. Hand out private copies.
++	meta.DAO = cloneZero(meta.DAO)
++	meta.Renderer = cloneZero(meta.Renderer)
++	if meta.TreeRenderer != nil {
++		meta.TreeRenderer = cloneZero(meta.TreeRenderer)
++	}
+ 
+ 	return meta
+ }
+ 
++// cloneZero returns a fresh instance of v's concrete type: value fields are
++// copied, non-nil pointer fields (e.g. an embedded *render.Base) are replaced
++// by new zero values so no mutable state is shared.
++func cloneZero[T any](v T) T {
++	rv := reflect.ValueOf(v)
++	if rv.Kind() != reflect.Pointer || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
++		return v
++	}
++	src := rv.Elem()
++	dst := reflect.New(src.Type())
++	dst.Elem().Set(src)
++	for i := 0; i < src.NumField(); i++ {
++		f := dst.Elem().Field(i)
++		if f.Kind() == reflect.Pointer && !f.IsNil() && f.CanSet() && f.Type().Elem().Kind() == reflect.Struct {
++			f.Set(reflect.New(f.Type().Elem()))
++		}
++	}
++	out, ok := dst.Interface().(T)
++	if !ok {
++		return v
++	}
++	return out
++}
++
+ // MetaFQN returns a fully qualified resource name.
+ func MetaFQN(m *metav1.ObjectMeta) string {
+ 	return FQN(m.Namespace, m.Name)
+diff --git a/model/tree.go b/model/tree.go
+index 1d59e44..e6236be 100644
+--- a/model/tree.go
++++ b/model/tree.go
+@@ -293,15 +293,12 @@ func treeHydrate(ctx context.Context, ns string, oo []runtime.Object, re TreeRen
+ 	if re == nil {
+ 		return fmt.Errorf("no tree renderer defined for this resource")
+ 	}
+-	pool := internal.NewWorkerPool(ctx, internal.DefaultPoolSize)
++	// kubeon: renderers add children to the shared root node without locks;
++	// render sequentially instead of through a worker pool.
+ 	for _, o := range oo {
+-		pool.Add(func(_ context.Context) error {
+-			return re.Render(ctx, ns, o)
+-		})
+-	}
+-	errs := pool.Drain()
+-	if len(errs) > 0 {
+-		return errs[0]
++		if err := re.Render(ctx, ns, o); err != nil {
++			return err
++		}
+ 	}
+ 
+ 	return nil

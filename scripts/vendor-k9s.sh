@@ -35,6 +35,11 @@ done
 grep -rl 'github.com/derailed/k9s/internal' "$DST" --include='*.go' |
   xargs sed -i "s#github.com/derailed/k9s/internal#$MOD#g"
 
+# kubeon fixes (paths relative to third_party/k9s, imports already rewritten)
+for p in "$ROOT"/third_party/_k9s-patches/*.patch; do
+  patch -d "$DST" -p1 < "$p"
+done
+
 cp "$TMP/k9s/LICENSE" "$DST/LICENSE"
 echo "$K9S_REF $(git -C "$TMP/k9s" rev-parse HEAD)" > "$DST/UPSTREAM"
 echo "vendored k9s $K9S_REF into $DST"

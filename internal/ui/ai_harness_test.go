@@ -46,7 +46,7 @@ func TestUIAssistant(t *testing.T) {
 	a.ai.add(&chatItem{kind: chatUser, text: "Scale web back to 3 replicas"})
 	a.ai.add(&chatItem{kind: chatTool, tool: &ai.ToolRun{ID: "t1", Name: "describe_resource", Args: "kind=deploy name=web", Output: "Replicas: 3 desired", Duration: 420 * time.Millisecond}})
 	a.ai.add(&chatItem{kind: chatAssistant, text: "The deployment **web** runs `3/3` replicas.\n\n- rollout is healthy\n- no warnings\n\n```yaml\nspec:\n  replicas: 3\n```"})
-	it := a.ai.add(&chatItem{kind: chatProposal, prop: &ai.Proposal{Action: "scale", Kind: "deploy", GVR: "apps/v1/deployments", Name: "web", Namespace: "demo", Replicas: &three, Reason: "Keep 3 replicas for availability."}})
+	it := a.ai.add(&chatItem{kind: chatProposal, cluster: a.cluster, prop: &ai.Proposal{Action: "scale", Kind: "deploy", GVR: "apps/v1/deployments", Name: "web", Namespace: "demo", Replicas: &three, Reason: "Keep 3 replicas for availability."}})
 	h.settle(150 * time.Millisecond)
 	h.shot("42-ai-proposal")
 	a.ai.execute(it)

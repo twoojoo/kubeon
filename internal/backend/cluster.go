@@ -7,13 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	k9s "github.com/giovanni/kubeon/third_party/k9s"
 	"github.com/giovanni/kubeon/third_party/k9s/client"
@@ -23,13 +27,19 @@ import (
 
 const callTimeout = "15s"
 
-// Contexts lists the contexts declared in the given kubeconfig file only.
-// The file is never modified.
+// Contexts lists the contexts declared in the given kubeconfig file (or
+// path list, merged like kubectl). Files are never modified.
 func Contexts(kubeconfig string) (names []string, current string, err error) {
 	if kubeconfig == "" {
 		return nil, "", errors.New("no kubeconfig path given")
 	}
-	cfg, err := clientcmd.LoadFromFile(kubeconfig)
+	var cfg *clientcmdapi.Config
+	if paths := filepath.SplitList(kubeconfig); len(paths) > 1 {
+		// $KUBECONFIG list: merged like kubectl (missing files tolerated)
+		cfg, err = (&clientcmd.ClientConfigLoadingRules{Precedence: paths}).Load()
+	} else {
+		cfg, err = clientcmd.LoadFromFile(kubeconfig)
+	}
 	if err != nil {
 		return nil, "", err
 	}
@@ -55,15 +65,23 @@ type Cluster struct {
 	version string
 }
 
-// Connect dials the given context of the given kubeconfig file.
-// Only that explicit file is read: $KUBECONFIG and ~/.kube/config are ignored.
+// Connect dials the given context of the given kubeconfig file (or path
+// list). Only those files are read: ~/.kube/config is never added.
 func Connect(kubeconfig, kctx string) (*Cluster, error) {
 	if kubeconfig == "" {
 		return nil, errors.New("no kubeconfig path given")
 	}
 	flags := genericclioptions.NewConfigFlags(false)
 	kc, ctxName, timeout := kubeconfig, kctx, callTimeout
-	flags.KubeConfig = &kc
+	if len(filepath.SplitList(kc)) > 1 {
+		// a path list (release builds, from $KUBECONFIG): client-go merges
+		// $KUBECONFIG itself when no explicit file is given
+		if err := os.Setenv("KUBECONFIG", kc); err != nil {
+			return nil, err
+		}
+	} else {
+		flags.KubeConfig = &kc
+	}
 	flags.Timeout = &timeout
 	if ctxName != "" {
 		flags.Context = &ctxName
@@ -108,10 +126,32 @@ func Connect(kubeconfig, kctx string) (*Cluster, error) {
 // RefreshResources drops the discovery cache and reloads k9s resource metas
 // (picks up newly installed CRDs).
 func (c *Cluster) RefreshResources() error {
+	resMx.Lock()
+	defer resMx.Unlock()
 	if d, err := c.conn.CachedDiscovery(); err == nil {
 		d.Invalidate()
 	}
-	return dao.MetaAccess.LoadResources(c.factory)
+	resFor = nil
+	if err := dao.MetaAccess.LoadResources(c.factory); err != nil {
+		return err
+	}
+	resFor = c
+	return nil
+}
+
+// The k9s resource registry (dao.MetaAccess) is process-wide: resFor is the
+// cluster it currently describes.
+var (
+	resMx  sync.Mutex
+	resFor *Cluster
+)
+
+// ResourcesLoaded reports whether the process-wide resource registry holds
+// c's discovery (a slower, abandoned Connect may have replaced it).
+func (c *Cluster) ResourcesLoaded() bool {
+	resMx.Lock()
+	defer resMx.Unlock()
+	return resFor == c
 }
 
 // Close stops all informers and port-forwards.

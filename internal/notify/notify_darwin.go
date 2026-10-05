@@ -2,7 +2,7 @@ package notify
 
 import (
 	"os/exec"
-	"strconv"
+	"strings"
 )
 
 // Notifier sends notifications through Notification Center; safe for
@@ -12,14 +12,21 @@ type Notifier struct{ app string }
 // New returns a notifier for app.
 func New(app string) *Notifier { return &Notifier{app: app} }
 
+// The script is constant: texts (cluster-controlled) are passed as argv.
+const notifyScript = `on run argv
+	display notification (item 2 of argv) with title (item 1 of argv)
+end run`
+
+const notifyScriptSound = `on run argv
+	display notification (item 2 of argv) with title (item 1 of argv) sound name "Basso"
+end run`
+
 // Send shows a notification. Errors are returned, never fatal.
 func (n *Notifier) Send(summary, body string, urgency byte) error {
-	// strconv.Quote yields a valid AppleScript string literal for the
-	// characters that matter here (quotes, backslashes, newlines).
-	script := "display notification " + strconv.Quote(body) +
-		" with title " + strconv.Quote(n.app) + " subtitle " + strconv.Quote(summary)
+	script := notifyScript
 	if urgency == Critical {
-		script += ` sound name "Basso"`
+		script = notifyScriptSound
 	}
-	return exec.Command("osascript", "-e", script).Run()
+	clean := func(s string) string { return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "") }
+	return exec.Command("osascript", "-e", script, clean(summary), clean(body)).Run()
 }

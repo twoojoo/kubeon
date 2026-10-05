@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/giovanni/kubeon/internal/prefs"
 )
 
 // Kind of provider implementation.
@@ -84,7 +86,10 @@ func LoadConfig() *Config {
 	c := Config{Provider: "anthropic", Providers: map[string]ProviderConfig{}, path: ConfigPath()}
 	b, err := os.ReadFile(c.path)
 	if err == nil {
-		_ = json.Unmarshal(b, &c)
+		if err := json.Unmarshal(b, &c); err != nil {
+			prefs.Quarantine(c.path, err)
+			c = Config{Provider: "anthropic", path: c.path}
+		}
 	}
 	if c.Providers == nil {
 		c.Providers = map[string]ProviderConfig{}
@@ -100,11 +105,8 @@ func (c *Config) Save() error {
 	if c.path == "" {
 		c.path = ConfigPath()
 	}
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o700); err != nil {
-		return err
-	}
 	b, _ := json.MarshalIndent(c, "", "  ")
-	return os.WriteFile(c.path, b, 0o600)
+	return prefs.WriteFileAtomic(c.path, b)
 }
 
 // Current returns the active preset and its effective settings.

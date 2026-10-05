@@ -30,6 +30,8 @@ type SanitizerView struct {
 	sevBtns [4]widget.Clickable
 	runBtn  widget.Clickable
 	askBtn  widget.Clickable
+	seq     int
+	cluster *backend.Cluster // the report's cluster
 }
 
 func newSanitizer(a *App) *SanitizerView {
@@ -39,25 +41,32 @@ func newSanitizer(a *App) *SanitizerView {
 }
 
 func (s *SanitizerView) open(ns string) {
+	if c := s.app.cluster; s.ns != ns || s.cluster != c {
+		// never show a report of another namespace or cluster
+		s.report, s.cluster = nil, c
+	}
 	s.ns = ns
 	s.run()
 }
 
+// run starts a lint; a newer run supersedes a pending one.
 func (s *SanitizerView) run() {
 	c := s.app.cluster
-	if c == nil || s.running {
+	if c == nil {
 		return
 	}
+	s.seq++
 	s.running = true
-	ns := s.ns
+	seq, ns := s.seq, s.ns
 	go func() {
 		r := c.Lint(ns)
 		s.app.post(func() {
-			s.running = false
-			if ns == s.ns {
-				s.report = r
-				s.links = map[int]*widget.Clickable{}
+			if seq != s.seq || c != s.app.cluster {
+				return
 			}
+			s.running = false
+			s.report = r
+			s.links = map[int]*widget.Clickable{}
 		})
 	}()
 }

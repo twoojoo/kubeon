@@ -24,14 +24,28 @@ func ResolveKubeconfig(flag string) (string, error) {
 	if p == "" {
 		return "", fmt.Errorf("no kubeconfig found")
 	}
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		return "", err
+	// release builds accept a $KUBECONFIG path list (merged like kubectl)
+	var out []string
+	for _, f := range filepath.SplitList(p) {
+		if f == "" {
+			continue
+		}
+		abs, err := filepath.Abs(f)
+		if err != nil {
+			return "", err
+		}
+		if err := checkPath(abs); err != nil {
+			return "", err
+		}
+		out = append(out, abs)
 	}
-	if err := checkPath(abs); err != nil {
-		return "", err
+	if len(out) == 0 {
+		return "", fmt.Errorf("no kubeconfig found")
 	}
-	return abs, nil
+	if Dev && len(out) > 1 {
+		return "", fmt.Errorf("dev build: a single kubeconfig is required")
+	}
+	return strings.Join(out, string(filepath.ListSeparator)), nil
 }
 
 // CheckContext validates a context name before connecting.
@@ -61,7 +75,7 @@ func defaultKubeconfig() string {
 		return devKubeconfig()
 	}
 	if env := os.Getenv("KUBECONFIG"); env != "" {
-		return filepath.SplitList(env)[0]
+		return env
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

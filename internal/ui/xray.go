@@ -82,8 +82,12 @@ func (x *XRayView) open(gvr, ns, focus string) {
 	x.raw, x.root, x.err, x.rows = nil, nil, "", nil
 	x.sel, x.selKey, x.pan = -1, "", f32.Point{}
 	x.collapsed = map[string]bool{}
-	x.watch = x.app.cluster.XRay(gvr, ns, func(n *backend.XNode, err error) {
+	var w *backend.XRayWatch
+	w = x.app.cluster.XRay(gvr, ns, func(n *backend.XNode, err error) {
 		x.app.post(func() {
+			if x.watch != w { // queued by a closed watch
+				return
+			}
 			if err != nil {
 				x.err = err.Error()
 				return
@@ -92,6 +96,7 @@ func (x *XRayView) open(gvr, ns, focus string) {
 			x.rebuild()
 		})
 	})
+	x.watch = w
 }
 
 func (x *XRayView) close() {

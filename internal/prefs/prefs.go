@@ -4,6 +4,7 @@ package prefs
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,6 +47,9 @@ type Prefs struct {
 	PortForwards []PortForward            `json:"portForwards,omitempty"`
 	Bookmarks    []Bookmark               `json:"bookmarks,omitempty"`
 
+	// LoadError reports a settings file that could not be parsed.
+	LoadError error `json:"-"`
+
 	mx   sync.Mutex
 	path string
 }
@@ -66,7 +70,11 @@ func Dir() string {
 func Load() *Prefs {
 	p := Prefs{path: filepath.Join(Dir(), "settings.json")}
 	if b, err := os.ReadFile(p.path); err == nil {
-		_ = json.Unmarshal(b, &p)
+		if err := json.Unmarshal(b, &p); err != nil {
+			// keep the broken file (context policies!) instead of
+			// overwriting it with defaults on the next save
+			p = Prefs{path: p.path, LoadError: fmt.Errorf("%s is invalid (%v); moved to %s", p.path, err, Quarantine(p.path, err))}
+		}
 	}
 	if p.Contexts == nil {
 		p.Contexts = map[string]ContextPolicy{}
@@ -85,7 +93,7 @@ func (p *Prefs) Save() error {
 		return err
 	}
 	b, _ := json.MarshalIndent(p, "", "  ")
-	return os.WriteFile(p.path, b, 0o600)
+	return WriteFileAtomic(p.path, b)
 }
 
 var prodRx = regexp.MustCompile(`(?i)(^|[^a-z])(prod|production|prd|live)([^a-z]|$)`)
@@ -142,15 +150,15 @@ func (p *Prefs) SavedForwards(ctx string) []PortForward {
 	return out
 }
 
-// AddBookmark adds or replaces (by name) a bookmark.
+// AddBookmark adds or replaces a bookmark (same name in the same context).
 func (p *Prefs) AddBookmark(b Bookmark) {
-	p.Bookmarks = slices.DeleteFunc(p.Bookmarks, func(x Bookmark) bool { return x.Name == b.Name })
+	p.RemoveBookmark(b)
 	p.Bookmarks = append(p.Bookmarks, b)
 }
 
-// RemoveBookmark deletes a bookmark by name.
-func (p *Prefs) RemoveBookmark(name string) {
-	p.Bookmarks = slices.DeleteFunc(p.Bookmarks, func(x Bookmark) bool { return x.Name == name })
+// RemoveBookmark deletes the bookmark with b's name and context.
+func (p *Prefs) RemoveBookmark(b Bookmark) {
+	p.Bookmarks = slices.DeleteFunc(p.Bookmarks, func(x Bookmark) bool { return x.Name == b.Name && x.Context == b.Context })
 }
 
 // BookmarksFor returns bookmarks usable on ctx.

@@ -85,7 +85,7 @@ func (a *App) bulk(verb string, ids []string, fn func(id string) error) {
 
 // confirmBulk confirms an action on several resources; protected contexts
 // require typing the context name.
-func (a *App) confirmBulk(verb string, ids []string, danger bool, fn func(id string) error) {
+func (a *App) confirmBulk(verb string, ids []string, danger bool, fn func(id string, force bool) error) {
 	if !a.allowMutation(verb) || len(ids) == 0 {
 		return
 	}
@@ -94,7 +94,9 @@ func (a *App) confirmBulk(verb string, ids []string, danger bool, fn func(id str
 		list = append(append([]string{}, ids[:8]...), fmt.Sprintf("… and %d more", len(ids)-8))
 	}
 	msg := fmt.Sprintf("%s %d resources?\n\n%s", verb, len(ids), strings.Join(list, "\n"))
-	c := newConfirm(a, verb, msg, danger, func(bool) { a.bulk(verb, ids, fn) })
+	c := newConfirm(a, verb, msg, danger, func(force bool) {
+		a.bulk(verb, ids, func(id string) error { return fn(id, force) })
+	})
 	if a.protected() {
 		c.typeName, c.prodCtx, c.danger = a.cluster.Context, a.cluster.Context, true
 	}
@@ -102,29 +104,35 @@ func (a *App) confirmBulk(verb string, ids []string, danger bool, fn func(id str
 }
 
 func (v *ResourceView) bulkDelete() {
-	ids, gvr, c := v.markedIDs(), v.gvr, v.app.cluster
-	if len(ids) < 2 {
-		v.confirmDelete()
+	ids, gvr, c := v.targets(), v.gvr, v.app.cluster
+	switch len(ids) {
+	case 0:
+		return
+	case 1: // the marked row if any, else the cursor row
+		v.confirmDeleteID(ids[0])
 		return
 	}
 	if isHelm(gvr) {
-		v.app.confirmBulk("Uninstall", ids, true, func(id string) error { return c.HelmUninstall(id) })
+		v.app.confirmBulk("Uninstall", ids, true, func(id string, _ bool) error { return c.HelmUninstall(id) })
 		return
 	}
 	if !backend.CanVerb(gvr, "delete") {
 		return
 	}
-	v.app.confirmBulk("Delete", ids, true, func(id string) error { return c.Delete(gvr, id, false) })
+	v.app.confirmBulk("Delete", ids, true, func(id string, force bool) error { return c.Delete(gvr, id, force) })
 }
 
 func (v *ResourceView) bulkRestart() {
-	ids, gvr, c := v.markedIDs(), v.gvr, v.app.cluster
-	if len(ids) < 2 {
-		v.restart()
+	ids, gvr, c := v.targets(), v.gvr, v.app.cluster
+	switch len(ids) {
+	case 0:
+		return
+	case 1:
+		v.restartID(ids[0])
 		return
 	}
 	if c.CanRestart(gvr) {
-		v.app.confirmBulk("Restart", ids, false, func(id string) error { return c.Restart(gvr, id) })
+		v.app.confirmBulk("Restart", ids, false, func(id string, _ bool) error { return c.Restart(gvr, id) })
 	}
 }
 
@@ -134,7 +142,7 @@ func (v *ResourceView) bulkCordon(on bool) {
 	if !on {
 		verb = "Uncordon"
 	}
-	v.app.confirmBulk(verb, ids, on, func(id string) error { return c.Cordon(id, on) })
+	v.app.confirmBulk(verb, ids, on, func(id string, _ bool) error { return c.Cordon(id, on) })
 }
 
 // ---- context menu ----
@@ -297,6 +305,22 @@ func (v *ResourceView) openContextMenu(at image.Point) {
 		return
 	}
 
+	// single-row actions read the selection when clicked: pin it back to
+	// the right-clicked row (live updates or tab switches may have moved it)
+	gvr, rowID := v.gvr, r.ID
+	add = func(show bool, ic *widget.Icon, label, hint string, danger bool, fn func()) {
+		if !show {
+			return
+		}
+		bound := func() {
+			if a.view != v || v.gvr != gvr || !v.selectID(rowID) {
+				a.flash(shortName(rowID)+" is no longer listed", true)
+				return
+			}
+			fn()
+		}
+		items = append(items, &menuItem{icon: ic, label: label, hint: hint, danger: danger, action: bound})
+	}
 	isPod := v.gvr == "v1/pods"
 	helm := isHelm(v.gvr)
 	add(true, icDescribe, "Describe", "d", false, func() { v.details(tabDescribe) })

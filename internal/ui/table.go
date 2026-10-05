@@ -85,8 +85,13 @@ func (v *ResourceView) openPath(gvr, ns, path string) {
 	v.widths = nil
 	v.list.Position = layout.Position{}
 	c := v.app.cluster
-	tw := c.WatchPath(gvr, ns, path, func(s *backend.Snapshot) {
-		v.app.post(func() { v.onSnapshot(s) })
+	var tw *backend.TableWatch
+	tw = c.WatchPath(gvr, ns, path, func(s *backend.Snapshot) {
+		v.app.post(func() {
+			if v.watch == tw { // drop snapshots queued by a closed watch
+				v.onSnapshot(s)
+			}
+		})
 	})
 	v.watch = tw
 	if f := v.filter.Text(); f != "" {
@@ -100,10 +105,26 @@ func (v *ResourceView) close() {
 		v.watch.Close()
 		v.watch = nil
 	}
+	// no table: keys must not act on rows that are no longer shown
+	v.snap, v.sel, v.selID, v.marked = nil, -1, "", nil
+}
+
+// selectID moves the cursor to the row with id; false if it is gone.
+func (v *ResourceView) selectID(id string) bool {
+	if v.snap == nil {
+		return false
+	}
+	for i := range v.snap.Rows {
+		if v.snap.Rows[i].ID == id {
+			v.setSel(i)
+			return true
+		}
+	}
+	return false
 }
 
 func (v *ResourceView) onSnapshot(s *backend.Snapshot) {
-	if v.watch == nil || s.GVR != v.watch.GVR() {
+	if v.watch == nil {
 		return
 	}
 	v.snap = s

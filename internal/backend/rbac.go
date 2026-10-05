@@ -140,6 +140,9 @@ func matchesSubject(s rbacv1.Subject, bindingNS string, sub Subject, groups []st
 			return true, s.Name
 		}
 	case rbacv1.UserKind:
+		if sub.Kind == rbacv1.ServiceAccountKind { // SAs authenticate as this user name
+			return s.Name == "system:serviceaccount:"+sub.Namespace+":"+sub.Name, ""
+		}
 		return sub.Kind == rbacv1.UserKind && s.Name == sub.Name, ""
 	case rbacv1.ServiceAccountKind:
 		ns := s.Namespace
@@ -198,11 +201,13 @@ func ruleAllows(r rbacv1.PolicyRule, verb, group, resource, sub, name string) bo
 	if !has(r.Verbs, verb) || !has(r.APIGroups, group) {
 		return false
 	}
+	// same matching as the RBAC authorizer: "*", the exact resource[/sub],
+	// or "*/sub" for a subresource of any resource ("pods/*" is no wildcard)
 	res := resource
 	if sub != "" {
 		res = resource + "/" + sub
 	}
-	if !has(r.Resources, res) && !(sub != "" && slices.Contains(r.Resources, resource+"/*")) {
+	if !has(r.Resources, res) && !(sub != "" && slices.Contains(r.Resources, "*/"+sub)) {
 		return false
 	}
 	return len(r.ResourceNames) == 0 || (name != "" && slices.Contains(r.ResourceNames, name))
@@ -228,11 +233,23 @@ func ParseResource(s string) (group, resource, sub string) {
 	return "", s, sub
 }
 
+// clusterScoped reports whether group/resource is a known cluster-scoped kind.
+func clusterScoped(group, resource string) bool {
+	g, ok := LookupAlias(resource)
+	if !ok || client.NewGVR(g).G() != group {
+		return false
+	}
+	return !IsNamespaced(g)
+}
+
 // Check evaluates a query locally and returns the matching rules.
 func (idx *RBACIndex) Check(sub Subject, q Query) (bool, []EffectiveRule) {
 	var match []EffectiveRule
+	cluster := clusterScoped(q.Group, q.Resource)
 	for _, er := range idx.Rules(sub) {
-		if er.Namespace != "" && er.Namespace != q.Namespace {
+		// RoleBindings grant only inside their namespace, never on
+		// cluster-scoped resources (nodes, namespaces, PVs…)
+		if er.Namespace != "" && (cluster || er.Namespace != q.Namespace) {
 			continue
 		}
 		if ruleAllows(er.Rule, q.Verb, q.Group, q.Resource, q.Subresource, q.Name) {

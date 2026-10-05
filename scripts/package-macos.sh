@@ -13,11 +13,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [[ "$(uname -s)" == Darwin ]] || { echo "package-macos.sh must run on macOS" >&2; exit 1; }
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo 0.0.0-dev)}"
+# shellcheck source=scripts/version.sh
+source "$ROOT/scripts/version.sh"
+VERSION="$(kubeon_version)"
 DIST="${DIST:-dist}"
 OUT="$DIST/macos"
 APP="$OUT/kubeon.app"
-export MACOSX_DEPLOYMENT_TARGET=11.0
+export MACOSX_DEPLOYMENT_TARGET=12.0 # Go 1.25 needs macOS 12+
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -35,7 +37,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create -output "$APP/Contents/MacOS/kubeon" "$OUT/kubeon-arm64" "$OUT/kubeon-amd64"
 rm "$OUT/kubeon-arm64" "$OUT/kubeon-amd64"
 lipo -info "$APP/Contents/MacOS/kubeon"
-sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
+sed -e "s/@VERSION@/$(num_version "$VERSION")/g" -e "s/@DISPLAY_VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
 cp packaging/icons/kubeon.icns "$APP/Contents/Resources/kubeon.icns"
 cp third_party/k9s/LICENSE "$APP/Contents/Resources/LICENSE.k9s"

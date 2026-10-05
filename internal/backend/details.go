@@ -377,11 +377,16 @@ func str(v any) string {
 }
 
 func (c *Cluster) eventsSection(u *unstructured.Unstructured) *Section {
-	ev := c.Events(u.GetNamespace(), u.GetName(), false, 15)
+	// Events matches names by substring: filter the exact object before
+	// limiting, or events of children (web-xxx pods) crowd it out
+	ev := c.Events(u.GetNamespace(), u.GetName(), false, 0)
 	var rows [][]Field
 	for _, e := range ev {
-		if !strings.HasSuffix(e.Object, "/"+u.GetName()) {
+		if e.Object != u.GetKind()+"/"+u.GetName() {
 			continue
+		}
+		if len(rows) == 15 {
+			break
 		}
 		tone := ToneNone
 		if e.Type == "Warning" {
@@ -427,7 +432,7 @@ func probeString(p *v1.Probe) string {
 	case p.GRPC != nil:
 		what = fmt.Sprintf("grpc :%d", p.GRPC.Port)
 	}
-	return fmt.Sprintf("%s (delay %ds, every %ds)", what, p.InitialDelaySeconds, max(p.PeriodSeconds, 10))
+	return fmt.Sprintf("%s (delay %ds, every %ds)", what, p.InitialDelaySeconds, p.PeriodSeconds)
 }
 
 // containerCard describes one container (spec + optional status).

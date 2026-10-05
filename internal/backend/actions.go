@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -145,7 +146,19 @@ func (c *Cluster) Apply(gvr, manifest string) error { return c.apply(gvr, manife
 // ApplyDryRun validates a manifest server-side without persisting it.
 func (c *Cluster) ApplyDryRun(gvr, manifest string) error { return c.apply(gvr, manifest, true) }
 
+var yamlDocSep = regexp.MustCompile(`(?m)^---[ \t]*$`)
+
 func (c *Cluster) apply(gvr, manifest string, dryRun bool) error {
+	docs := 0
+	for _, d := range yamlDocSep.Split(manifest, -1) {
+		if strings.TrimSpace(d) != "" {
+			docs++
+		}
+	}
+	if docs > 1 {
+		return errors.New("the manifest holds several objects: apply one at a time")
+	}
+	manifest = strings.TrimPrefix(strings.TrimSpace(manifest), "---")
 	var obj map[string]any
 	if err := yaml.Unmarshal([]byte(manifest), &obj); err != nil {
 		return fmt.Errorf("invalid yaml: %w", err)
@@ -162,14 +175,24 @@ func (c *Cluster) apply(gvr, manifest string, dryRun bool) error {
 		return err
 	}
 	var ri dynamic.ResourceInterface = dial.Resource(client.NewGVR(gvr).GVR())
-	if ns := u.GetNamespace(); ns != "" {
+	switch ns := u.GetNamespace(); {
+	case ns != "":
 		ri = dial.Resource(client.NewGVR(gvr).GVR()).Namespace(ns)
+	case IsNamespaced(gvr):
+		return errors.New("manifest has no metadata.namespace")
 	}
 	ctx, cancel := timeoutCtx()
 	defer cancel()
 	var dr []string
 	if dryRun {
 		dr = []string{metav1.DryRunAll}
+	}
+	if u.GetResourceVersion() == "" {
+		// not an edited live object (e.g. an assistant proposal, possibly
+		// partial): server-side apply merges instead of replacing, so
+		// omitted fields survive, and creates the object when missing
+		_, err = ri.Apply(ctx, u.GetName(), &u, metav1.ApplyOptions{FieldManager: "kubeon", Force: true, DryRun: dr})
+		return err
 	}
 	_, err = ri.Update(ctx, &u, metav1.UpdateOptions{FieldManager: "kubeon", DryRun: dr})
 	if apierrors.IsNotFound(err) {

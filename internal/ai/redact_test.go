@@ -70,3 +70,40 @@ func TestTextToolCalls(t *testing.T) {
 		t.Fatalf("got %+v", calls)
 	}
 }
+
+func TestRedactLastAppliedAndMultiDoc(t *testing.T) {
+	dep := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: '{"kind":"Deployment","spec":{"template":{"spec":{"containers":[{"env":[{"name":"DB_PASSWORD","value":"hunter2xyz"}]}]}}}}'
+`
+	if out := RedactManifest("deployments", dep); strings.Contains(out, "hunter2xyz") {
+		t.Fatalf("last-applied leaked:\n%s", out)
+	}
+	multi := "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: a}\n---\napiVersion: v1\nkind: Secret\nmetadata: {name: b}\ndata:\n  tls.key: c3VwZXJzZWNyZXQ=\n"
+	out := RedactManifest("", multi)
+	if strings.Contains(out, "c3VwZXJzZWNyZXQ=") || !strings.Contains(out, "ConfigMap") {
+		t.Fatalf("multi-doc:\n%s", out)
+	}
+}
+
+func TestCheckApplyManifest(t *testing.T) {
+	p := &Proposal{Action: "apply", Kind: "configmaps", GVR: "v1/configmaps", Name: "settings", Namespace: "demo"}
+	p.Manifest = "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: settings\ndata: {a: b}\n"
+	m, err := checkApplyManifest(p)
+	if err != nil || !strings.Contains(m, "namespace: demo") {
+		t.Fatalf("fill namespace: %v\n%s", err, m)
+	}
+	for _, bad := range []string{
+		"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: other, namespace: demo}\n",
+		"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: settings, namespace: prod}\n",
+		"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: settings}\ndata: {pw: <redacted>}\n",
+	} {
+		p.Manifest = bad
+		if _, err := checkApplyManifest(p); err == nil {
+			t.Errorf("accepted:\n%s", bad)
+		}
+	}
+}

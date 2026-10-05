@@ -10,7 +10,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo 0.0.0-dev)}"
+# shellcheck source=scripts/version.sh
+source "$ROOT/scripts/version.sh"
+VERSION="$(kubeon_version)"
 DIST="${DIST:-dist}"
 IMAGE="kubeon-build-linux"
 
@@ -68,7 +70,7 @@ rm -rf "$APPDIR"
 
 echo "==> deb / rpm"
 # nfpm doesn't expand variables in contents paths: render the config
-sed -e "s|\${VERSION}|$VERSION|g" -e "s|\${ARCH}|$ARCH|g" -e "s|\${DIST}|$DIST|g" \
+sed -e "s|\${VERSION}|$(pkg_version "$VERSION")|g" -e "s|\${ARCH}|$ARCH|g" -e "s|\${DIST}|$DIST|g" \
   packaging/linux/nfpm.yaml > "$OUT/nfpm.yaml"
 nfpm package --config "$OUT/nfpm.yaml" --packager deb --target "$DIST/"
 nfpm package --config "$OUT/nfpm.yaml" --packager rpm --target "$DIST/"

@@ -134,8 +134,30 @@ func newApp(opts Options, w *app.Window) *App {
 	return &a
 }
 
+// ensureResources reloads the process-wide resource registry when an
+// abandoned, slower connect to another context overwrote it.
+func (a *App) ensureResources() {
+	c := a.cluster
+	if c == nil || c.ResourcesLoaded() {
+		return
+	}
+	go func() {
+		if err := c.RefreshResources(); err != nil {
+			return
+		}
+		a.post(func() {
+			if a.cluster == c {
+				a.sidebar.reload(c)
+			}
+		})
+	}()
+}
+
 // start lists contexts and connects to the initial one.
 func (a *App) start() {
+	if err := a.prefs.LoadError; err != nil {
+		a.flash("Settings reset: "+err.Error(), true)
+	}
 	opts := a.opts
 	names, current, err := backend.Contexts(opts.Kubeconfig)
 	if err != nil {
@@ -258,6 +280,7 @@ func (a *App) connect(kctx string) {
 				if c != nil {
 					c.Close()
 				}
+				a.ensureResources()
 				return
 			}
 			a.connecting = ""
@@ -266,6 +289,7 @@ func (a *App) connect(kctx string) {
 				return
 			}
 			a.cluster, a.namespaces = c, nss
+			a.ensureResources()
 			a.ai.reset()
 			a.tabs, a.tabIdx = nil, 0
 			a.startSavedForwards(c)
@@ -313,7 +337,8 @@ func (a *App) textFocused(gtx C) bool {
 	if a.overlay != nil {
 		return true
 	}
-	return gtx.Focused(&a.view.filter) || a.drawer.focused(gtx) || a.dock.focused(gtx) || a.ai.focused(gtx)
+	return gtx.Focused(&a.view.filter) || a.drawer.focused(gtx) || a.dock.focused(gtx) || a.ai.focused(gtx) ||
+		a.rbac.focused(gtx)
 }
 
 func (a *App) layout(gtx C) {

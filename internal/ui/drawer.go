@@ -2,9 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"gioui.org/io/key"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"gioui.org/io/clipboard"
@@ -50,6 +49,7 @@ type Drawer struct {
 	valLine  int
 	valWarn  string
 	values   widget.Editor
+	drafts   map[string]string // unsaved YAML edits by context|gvr|path
 
 	secret     []backend.SecretEntry
 	revealed   map[string]bool
@@ -65,7 +65,7 @@ type Drawer struct {
 }
 
 func newDrawer(a *App) *Drawer {
-	d := Drawer{app: a, revealed: map[string]bool{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
+	d := Drawer{app: a, revealed: map[string]bool{}, drafts: map[string]string{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
 	d.detV = newDetailsView(a)
 	d.yamlV, d.valV = newYAMLView(), newYAMLView()
 	d.describe.ReadOnly = true
@@ -107,8 +107,10 @@ func (d *Drawer) focused(gtx C) bool {
 func (d *Drawer) show(gvr, path string, tab int, edit bool) {
 	d.open = true
 	if d.gvr != gvr || d.path != path {
+		d.stashDraft()
 		d.gvr, d.path = gvr, path
 		d.revealed, d.revealAll = map[string]bool{}, false
+		d.secret = nil
 		d.load()
 	}
 	if !d.hasTab(tab) {
@@ -127,6 +129,7 @@ func (d *Drawer) follow(gvr, path string) {
 	if d.gvr != gvr || d.path != path {
 		d.gvr, d.path = gvr, path
 		d.revealed, d.revealAll = map[string]bool{}, false
+		d.secret = nil // never export the previous secret while loading
 		d.load()
 		if !d.hasTab(d.tab) {
 			d.tab = d.tabs()[0]
@@ -134,7 +137,28 @@ func (d *Drawer) follow(gvr, path string) {
 	}
 }
 
+// draftKey identifies the edited object across contexts.
+func (d *Drawer) draftKey() string {
+	if d.app.cluster == nil || d.gvr == "" {
+		return ""
+	}
+	return d.app.cluster.Context + "|" + d.gvr + "|" + d.path
+}
+
+// stashDraft keeps unsaved YAML edits when the drawer leaves the object
+// (navigation, links, esc): reopening the object restores them.
+func (d *Drawer) stashDraft() {
+	if !d.editing || !d.dirty {
+		return
+	}
+	if k := d.draftKey(); k != "" {
+		d.drafts[k] = d.yaml.Text()
+		d.app.flash("Unsaved edits to "+d.path+" kept: reopen it to continue", false)
+	}
+}
+
 func (d *Drawer) close() {
+	d.stashDraft()
 	d.open, d.editing, d.dirty = false, false, false
 	d.gvr, d.path = "", ""
 	d.secret = nil
@@ -199,23 +223,39 @@ func (d *Drawer) load() {
 			d.valV.set(vals)
 			d.original = y
 			d.secret = sec
+			if draft, ok := d.drafts[d.draftKey()]; ok && yerr == nil {
+				d.yaml.SetText(draft)
+				d.setEditing(true)
+				d.dirty = draft != y
+				d.app.flash("Restored unsaved edits to "+d.path, false)
+			}
 		})
 	}()
 }
 
-func (d *Drawer) save() {
-	c := d.app.cluster
-	gvr, manifest := d.gvr, d.yaml.Text()
-	d.app.do("Apply "+d.path, func() error {
-		if err := c.Apply(gvr, manifest); err != nil {
-			return err
+// saveReviewed applies exactly the manifest shown and dry-run in the diff
+// review, on the cluster it was reviewed against.
+func (d *Drawer) saveReviewed(gvr, path, manifest string) func() {
+	a, c := d.app, d.app.cluster
+	key := d.draftKey()
+	return func() {
+		if a.stale(c) {
+			return
 		}
-		d.app.post(func() {
-			d.setEditing(false)
-			d.load()
+		a.do("Apply "+path, func() error {
+			if err := c.Apply(gvr, manifest); err != nil {
+				return err
+			}
+			a.post(func() {
+				delete(d.drafts, key)
+				if d.gvr == gvr && d.path == path {
+					d.setEditing(false)
+					d.load()
+				}
+			})
+			return nil
 		})
-		return nil
-	})
+	}
 }
 
 func (d *Drawer) clickFor(m map[string]*widget.Clickable, k string) *widget.Clickable {
@@ -265,17 +305,20 @@ func (d *Drawer) Layout(gtx C) D {
 	}
 	if d.revertBtn.Clicked(gtx) {
 		d.yaml.SetText(d.original)
+		delete(d.drafts, d.draftKey())
 		d.dirty = false
 		d.setEditing(false)
 	}
 	if d.saveBtn.Clicked(gtx) && d.dirty && d.valMsg == "" && d.app.allowMutation("Apply") {
-		d.app.overlay = newDiffReview(d.app, "Review changes", d.path, d.gvr, d.original, d.yaml.Text(), d.save)
+		after := d.yaml.Text()
+		d.app.overlay = newDiffReview(d.app, "Review changes", d.path, d.gvr, d.original, after, d.saveReviewed(d.gvr, d.path, after))
+		gtx.Execute(key.FocusCmd{}) // keystrokes must not keep editing under the review
 	}
 	if d.revealBtn.Clicked(gtx) {
 		d.revealAll = !d.revealAll
 		d.revealed = map[string]bool{}
 	}
-	if d.envBtn.Clicked(gtx) {
+	if d.envBtn.Clicked(gtx) && len(d.secret) > 0 {
 		copyText(gtx, secretEnv(d.secret))
 		d.app.flash("Secret copied as .env ("+itoa(len(d.secret))+" keys)", false)
 	}
@@ -499,10 +542,12 @@ func (d *Drawer) shown(k string) bool {
 }
 
 func (d *Drawer) downloadSecret() {
-	dir := downloadsDir()
+	if len(d.secret) == 0 { // still loading the selected secret
+		return
+	}
 	name := strings.ReplaceAll(d.path, "/", "_") + ".env"
-	p := filepath.Join(dir, name)
-	if err := os.WriteFile(p, []byte(secretEnv(d.secret)), 0o600); err != nil {
+	p, err := saveNew(name, []byte(secretEnv(d.secret)))
+	if err != nil {
 		d.app.flash("download failed: "+err.Error(), true)
 		return
 	}

@@ -75,14 +75,24 @@ func (v *ResourceView) shell() {
 	go func() {
 		cc, err := c.Containers(path)
 		a.post(func() {
+			if a.stale(c) {
+				return
+			}
 			if err != nil {
 				a.flash("containers: "+err.Error(), true)
 				return
 			}
 			open := func(co string) {
+				if a.stale(c) {
+					return
+				}
 				if a.protected() {
 					a.overlay = a.guard(newConfirm(a, "Open shell", fmt.Sprintf("Open an interactive shell in %s/%s?", path, co), true,
-						func(bool) { a.dock.openShell(path, co) }), path)
+						func(bool) {
+							if !a.stale(c) {
+								a.dock.openShell(path, co)
+							}
+						}), path)
 					return
 				}
 				a.dock.openShell(path, co)
@@ -111,17 +121,26 @@ func (v *ResourceView) scale() {
 	go func() {
 		cur, err := c.Replicas(gvr, path)
 		a.post(func() {
+			if a.stale(c) {
+				return
+			}
 			if err != nil {
 				a.flash("replicas: "+err.Error(), true)
 				return
 			}
 			p := newPicker(a, fmt.Sprintf("Scale %s (current %d) — type replicas", path, cur), nil, true, func(s string) {
+				if a.stale(c) {
+					return
+				}
 				n, err := strconv.Atoi(strings.TrimSpace(s))
 				if err != nil || n < 0 {
 					a.flash("invalid replica count", true)
 					return
 				}
 				run := func() {
+					if a.stale(c) {
+						return
+					}
 					a.do(fmt.Sprintf("Scale %s to %d", path, n), func() error {
 						return c.Scale(gvr, path, int32(n))
 					})
@@ -139,30 +158,40 @@ func (v *ResourceView) scale() {
 }
 
 func (v *ResourceView) restart() {
-	r, ok := v.selected()
+	if r, ok := v.selected(); ok {
+		v.restartID(r.ID)
+	}
+}
+
+func (v *ResourceView) restartID(path string) {
 	c := v.app.cluster
-	if !ok || !c.CanRestart(v.gvr) {
+	if !c.CanRestart(v.gvr) {
 		return
 	}
-	a, gvr, path := v.app, v.gvr, r.ID
+	a, gvr := v.app, v.gvr
 	a.confirmMutation("Restart", fmt.Sprintf("Rollout restart %s?", path), path, false, func() {
 		a.do("Restart "+path, func() error { return c.Restart(gvr, path) })
 	})
 }
 
 func (v *ResourceView) confirmDelete() {
-	r, ok := v.selected()
-	if ok && v.gvr == backend.HelmGVR {
-		a, c, rel := v.app, v.app.cluster, r.ID
+	if r, ok := v.selected(); ok {
+		v.confirmDeleteID(r.ID)
+	}
+}
+
+func (v *ResourceView) confirmDeleteID(id string) {
+	if v.gvr == backend.HelmGVR {
+		a, c, rel := v.app, v.app.cluster, id
 		a.confirmMutation("Uninstall", fmt.Sprintf("Uninstall helm release %s?", rel), rel, true, func() {
 			a.do("Uninstall "+rel, func() error { return c.HelmUninstall(rel) })
 		})
 		return
 	}
-	if !ok || isHelm(v.gvr) || !backend.CanVerb(v.gvr, "delete") {
+	if isHelm(v.gvr) || !backend.CanVerb(v.gvr, "delete") {
 		return
 	}
-	a, gvr, path, c := v.app, v.gvr, r.ID, v.app.cluster
+	a, gvr, path, c := v.app, v.gvr, id, v.app.cluster
 	if !a.allowMutation("Delete") {
 		return
 	}
@@ -253,7 +282,7 @@ func (a *App) runCommand(cmd string) {
 			a.pickNamespace()
 			return
 		}
-		a.setNamespace(strings.TrimPrefix(f[1], "all"))
+		a.setNamespace(nsArg(f[1]))
 		return
 	case "ctx", "context":
 		if len(f) == 1 {
@@ -325,7 +354,7 @@ func (a *App) runCommand(cmd string) {
 		return
 	}
 	if len(f) > 1 {
-		a.ns = strings.TrimPrefix(f[1], "all")
+		a.ns = nsArg(f[1])
 	}
 	a.openResource(gvr)
 }
@@ -338,6 +367,17 @@ func canForward(gvr string) bool {
 	return false
 }
 
+// stale reports (and tells the user) that the context changed since an
+// action on cluster c started: its continuation must not run on another
+// cluster or under another cluster's policy.
+func (a *App) stale(c *backend.Cluster) bool {
+	if a.cluster == c {
+		return false
+	}
+	a.flash("Context changed: action cancelled", true)
+	return true
+}
+
 // portForward asks for "local:remote" and opens a tunnel.
 func (v *ResourceView) portForward() {
 	r, ok := v.selected()
@@ -348,6 +388,9 @@ func (v *ResourceView) portForward() {
 	go func() {
 		ports, err := c.ContainerPorts(gvr, path)
 		a.post(func() {
+			if a.stale(c) {
+				return
+			}
 			if err != nil {
 				a.flash("ports: "+err.Error(), true)
 				return
@@ -357,6 +400,9 @@ func (v *ResourceView) portForward() {
 				items = append(items, fmt.Sprintf("%d:%d", p, p))
 			}
 			p := newPicker(a, "Port-forward "+path+"  (local:remote, local 0 = random)", items, true, func(s string) {
+				if a.stale(c) {
+					return
+				}
 				lp, rp, ok := strings.Cut(strings.TrimSpace(s), ":")
 				if !ok {
 					lp, rp = "0", lp
@@ -494,4 +540,13 @@ func (v *ResourceView) rollback() {
 	a.confirmMutation("Rollback", fmt.Sprintf("Roll back %s to revision %s?", rel, rev), rel, false, func() {
 		a.do("Rollback "+rel+" to "+rev, func() error { return c.HelmRollback(rel, rev) })
 	})
+}
+
+// nsArg maps a palette namespace argument: "all" means all namespaces;
+// anything else is a namespace name, "alloy" included.
+func nsArg(s string) string {
+	if s == "all" {
+		return ""
+	}
+	return s
 }

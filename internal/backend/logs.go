@@ -60,12 +60,13 @@ func stripTimestamp(l string) string {
 	return l[i+1:]
 }
 
-// k9s escapes log bytes for tview ("[foo]" → "[foo[]"); undo it.
-var tviewEscRx = regexp.MustCompile(`\[([a-zA-Z0-9_,;: \-\."#]+)\[\]`)
+// k9s escapes log bytes for tview (tview.Escape: "[foo]" → "[foo[]",
+// "[a[]" → "[a[[]"); this is its exact inverse.
+var tviewEscRx = regexp.MustCompile(`(\[[a-zA-Z0-9_,;: \-\."#]+\[*)\[\]`)
 
 func unescapeTview(s string) string {
 	if !strings.Contains(s, "[]") {
 		return s
 	}
-	return tviewEscRx.ReplaceAllString(s, "[$1]")
+	return tviewEscRx.ReplaceAllString(s, "$1]")
 }

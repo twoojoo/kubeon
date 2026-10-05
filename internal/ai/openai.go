@@ -79,6 +79,8 @@ func (o *OpenAICompat) messages(system string, history []Message) []openai.ChatC
 			a := openai.ChatCompletionAssistantMessageParam{}
 			if m.Text != "" {
 				a.Content.OfString = openai.String(m.Text)
+			} else if len(m.Calls) == 0 { // empty turns are rejected
+				a.Content.OfString = openai.String("(no output)")
 			}
 			for _, c := range m.Calls {
 				a.ToolCalls = append(a.ToolCalls, openai.ChatCompletionMessageToolCallUnionParam{
@@ -135,10 +137,10 @@ func (o *OpenAICompat) Stream(ctx context.Context, req Request, onText func(stri
 	ch := acc.Choices[0]
 	turn.Text = ch.Message.Content
 	turn.Native = ch.Message.ToParam()
-	for i, tc := range ch.Message.ToolCalls {
+	for _, tc := range ch.Message.ToolCalls {
 		id := tc.ID
 		if id == "" { // some local servers omit ids: use neutral history
-			id = "call_" + itoa(i)
+			id = newCallID("call")
 			turn.Native = nil
 		}
 		args := tc.Function.Arguments
@@ -156,9 +158,4 @@ func (o *OpenAICompat) Stream(ctx context.Context, req Request, onText func(stri
 		turn.StopReason = "refusal"
 	}
 	return &turn, nil
-}
-
-func itoa(i int) string {
-	b, _ := json.Marshal(i)
-	return string(b)
 }

@@ -1,6 +1,5 @@
-diff -ruN a/app/os_wayland.go gio/app/os_wayland.go
---- a/app/os_wayland.go	2026-10-03 11:08:47.817995428 +0200
-+++ b/app/os_wayland.go	2026-10-03 11:09:54.815114494 +0200
+--- a/app/os_wayland.go	2026-10-05 08:54:29.499173459 +0200
++++ b/app/os_wayland.go	2026-10-05 08:54:29.499173459 +0200
 @@ -215,6 +215,9 @@
  	size         image.Point
  	config       Config
@@ -66,7 +65,17 @@ diff -ruN a/app/os_wayland.go gio/app/os_wayland.go
  }
  
  //export gio_onToplevelDecorationConfigure
-@@ -939,12 +986,31 @@
+@@ -882,7 +929,8 @@
+ 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
+ 	s.pointerFocus = w
+ 	w.setCursor(pointer, serial)
+-	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
++	// kubeon: scale like onPointerMotion (HiDPI double-click detection)
++	w.lastPos = f32.Point{X: fromFixed(x) * float32(w.scale), Y: fromFixed(y) * float32(w.scale)}
+ }
+ 
+ //export gio_onPointerLeave
+@@ -939,12 +987,31 @@
  			return
  		}
  		act, ok := w.w.ActionAt(w.lastPos)

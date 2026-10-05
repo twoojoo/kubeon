@@ -52,6 +52,16 @@ func (d *Dock) closeTab(i int) {
 	}
 	d.tabs[i].Close()
 	d.tabs = append(d.tabs[:i], d.tabs[i+1:]...)
+	// click states follow their tabs
+	if i < len(d.tabBtn) {
+		d.tabBtn = append(d.tabBtn[:i], d.tabBtn[i+1:]...)
+	}
+	if i < len(d.closeBt) {
+		d.closeBt = append(d.closeBt[:i], d.closeBt[i+1:]...)
+	}
+	if i < d.active { // keep the same tab active
+		d.active--
+	}
 	if d.active >= len(d.tabs) {
 		d.active = len(d.tabs) - 1
 	}

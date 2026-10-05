@@ -37,6 +37,9 @@ func ImportShellEnv() {
 	cmd := exec.CommandContext(ctx, shell, "-ilc", "printf '"+envMarker+"'; command env -0; printf '"+envMarker+"'")
 	cmd.Stdin = nil
 	cmd.Stderr = nil
+	// rc files may start background jobs that inherit stdout: don't wait for
+	// their EOF after the shell is gone, or the app never starts
+	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
 		return

@@ -929,7 +929,8 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.pointerFocus = w
 	w.setCursor(pointer, serial)
-	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
+	// kubeon: scale like onPointerMotion (HiDPI double-click detection)
+	w.lastPos = f32.Point{X: fromFixed(x) * float32(w.scale), Y: fromFixed(y) * float32(w.scale)}
 }
 
 //export gio_onPointerLeave

@@ -231,6 +231,11 @@ func (p *Pod) TailLogs(ctx context.Context, opts *LogOptions) ([]LogChan, error)
 	outs := make([]LogChan, 0, coCounts)
 	if co, ok := GetDefaultContainer(&po.ObjectMeta, &po.Spec); ok && !opts.AllContainers {
 		opts.DefaultContainer = co
+		// kubeon: the log request needs the container name; k9s' view sets
+		// it, other callers leave it empty and the API server rejects them.
+		if opts.Container == "" {
+			opts.Container = co
+		}
 		return append(outs, tailLogs(ctx, p, opts)), nil
 	}
 	if opts.HasContainer() && !opts.AllContainers {

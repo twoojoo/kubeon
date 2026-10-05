@@ -52,7 +52,8 @@ func parseMarkdown(s string) []mdBlock {
 			out = append(out, mdBlock{heading: n, text: strings.TrimSpace(t[n:])})
 		case strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") || strings.HasPrefix(t, "• "):
 			flush()
-			out = append(out, mdBlock{bullet: true, text: strings.TrimSpace(t[2:])})
+			_, rest, _ := strings.Cut(t, " ") // "•" is 3 bytes
+			out = append(out, mdBlock{bullet: true, text: strings.TrimSpace(rest)})
 		case len(t) > 2 && t[0] >= '0' && t[0] <= '9' && (strings.HasPrefix(t[1:], ". ") || (len(t) > 3 && t[1] >= '0' && t[1] <= '9' && strings.HasPrefix(t[2:], ". "))):
 			flush()
 			out = append(out, mdBlock{text: t}) // numbered item kept as its own line

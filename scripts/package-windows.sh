@@ -6,14 +6,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo 0.0.0-dev)}"
+# shellcheck source=scripts/version.sh
+source "$ROOT/scripts/version.sh"
+VERSION="$(kubeon_version)"
 DIST="${DIST:-dist}"
 ARCHES="${ARCHES:-amd64 arm64}"
 WINRES="github.com/tc-hib/go-winres@v0.3.3"
 
 # Windows version resources need a numeric a.b.c.d version
-NUMVER="$(echo "$VERSION" | grep -oE '^[0-9]+(\.[0-9]+){0,3}' || true)"
-NUMVER="${NUMVER:-0.0.0}"
+NUMVER="$(num_version "$VERSION")"
 
 echo "==> resources ($VERSION / $NUMVER)"
 trap 'rm -f cmd/kubeon/rsrc_windows_*.syso' EXIT
