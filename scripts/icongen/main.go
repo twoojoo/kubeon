@@ -130,7 +130,7 @@ func main() {
 		SubImage(image.Rectangle) image.Image
 	}); ok {
 		t := sub.SubImage(tileBounds(art))
-		tile = resize(t, 256)
+		tile = resize(t, 512) // the UI scales it down per size (internal/ui/logo.go)
 	}
 	if err := os.WriteFile(filepath.Join(*ui, "logo.png"), encode(tile), 0o644); err != nil {
 		log.Fatal(err)
