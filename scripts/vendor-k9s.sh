@@ -5,8 +5,9 @@
 # or replaced by files from third_party/k9s-overlay.
 set -euo pipefail
 
-K9S_REF="${K9S_REF:-v0.51.0}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# default: re-vendor the version recorded in third_party/k9s/UPSTREAM
+K9S_REF="${K9S_REF:-$(cut -d' ' -f1 "$ROOT/third_party/k9s/UPSTREAM")}"
 DST="$ROOT/third_party/k9s"
 OVERLAY="$ROOT/third_party/_k9s-overlay" # "_" prefix: ignored by go build
 MOD="github.com/giovanni/kubeon/third_party/k9s"

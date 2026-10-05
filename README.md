@@ -148,6 +148,23 @@ repository. Secrets: `UPDATE_SIGNING_KEY` (release signing key) and
 `kubeon-releases` only). `packaging/releases-repo/README.md` is that
 repository's README.
 
+### Upstream k9s
+
+`.github/workflows/upstream-k9s.yml` runs daily:
+
+- keeps the **"k9s upstream watch"** issue up to date with what k9s `master`
+  changed in the vendored packages since the vendored release (commits,
+  per-package diffstat, files kubeon patches or overlays);
+- when a **new k9s release** is out, re-vendors it, re-applies
+  `third_party/_k9s-patches` and the overlays, runs `go mod tidy`, build, unit
+  and kind integration tests, and opens a pull request (draft if anything
+  failed) with the report — or an issue, if Actions may not open PRs. Run it
+  by hand with a tag or branch (`ref`) to try one early.
+
+Locally: `scripts/k9s-upstream-report.sh [tag|master]` prints the same report;
+`K9S_REF=<tag> make vendor-k9s` re-vendors (default: the version in
+`third_party/k9s/UPSTREAM`).
+
 ## Development (safe by construction)
 
 Dev builds (`-tags dev`) are **locked to a disposable kind cluster**: they only accept a
