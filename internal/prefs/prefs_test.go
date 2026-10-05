@@ -83,7 +83,7 @@ func TestBrokenSettingsQuarantined(t *testing.T) {
 	if len(m) != 1 {
 		t.Fatalf("broken file not kept: %v", m)
 	}
-	if st, _ := os.Stat(path); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(path); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 { // no unix modes on Windows
 		t.Fatalf("mode %v", st.Mode())
 	}
 }
