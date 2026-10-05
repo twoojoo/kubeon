@@ -65,7 +65,7 @@ func (a *App) onHealth(ev []backend.HealthEvent) {
 			body = b.String()
 		}
 		n := a.notifier
-		go func() { _ = n.Send("kubeon · "+summary, body, urg) }()
+		go func() { _ = n.Send(AppName+" · "+summary, body, urg) }()
 	}
 	last := ev[len(ev)-1]
 	a.flash(last.Title+" — "+last.Body, last.Severity == backend.SevErr)

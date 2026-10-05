@@ -134,7 +134,7 @@ func TestInstallRejectsBadSignatures(t *testing.T) {
 	fakeRelease(t, "9.9.9", files, other) // …but signed by another one
 	r, _ := Latest(context.Background())
 	if err := Install(context.Background(), r, Plan{Kind: KindAppImage, Target: target}, nil); err == nil ||
-		!strings.Contains(err.Error(), "not signed by the kubeon release key") {
+		!strings.Contains(err.Error(), "not signed by the Kubeon release key") {
 		t.Fatalf("foreign signature accepted: %v", err)
 	}
 	fakeRelease(t, "9.9.9", files, nil) // unsigned
@@ -182,7 +182,7 @@ func TestInstallMacAppAndWindows(t *testing.T) {
 	mac := assetName(KindMacApp, "9.9.9")
 	win := assetName(KindWindows, "9.9.9")
 	fakeRelease(t, "9.9.9", map[string][]byte{
-		mac: zipOf(t, map[string]string{"kubeon.app/Contents/MacOS/kubeon": "NEW MAC", "kubeon.app/Contents/Info.plist": "plist"}),
+		mac: zipOf(t, map[string]string{"Kubeon.app/Contents/MacOS/kubeon": "NEW MAC", "Kubeon.app/Contents/Info.plist": "plist"}),
 		win: zipOf(t, map[string]string{"kubeon.exe": "NEW EXE", "LICENSE.k9s.txt": "x"}),
 	}, priv)
 	r, _ := Latest(context.Background())

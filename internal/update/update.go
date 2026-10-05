@@ -173,7 +173,7 @@ func verifySums(sums, sig []byte) (map[string]string, error) {
 	}
 	s, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
 	if err != nil || !ed25519.Verify(pub, sums, s) {
-		return nil, errors.New("release checksums are not signed by the kubeon release key")
+		return nil, errors.New("release checksums are not signed by the Kubeon release key")
 	}
 	out := map[string]string{}
 	for _, l := range strings.Split(string(sums), "\n") {

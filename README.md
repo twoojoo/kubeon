@@ -1,4 +1,4 @@
-# kubeon
+# Kubeon
 
 Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 
@@ -53,7 +53,7 @@ vars with sensitive names, bearer tokens, passwords in URLs/logs, JWTs, cloud an
 VCS tokens and PEM private keys are redacted from every tool output.
 
 Local models need reliable tool calling (e.g. Llama 3.1 8B+, Qwen 2.5 7B+); very
-small models may describe tool calls instead of making them — kubeon executes
+small models may describe tool calls instead of making them — Kubeon executes
 well-formed JSON calls written as text, but larger models give far better answers.
 
 ## Install
@@ -66,9 +66,9 @@ Release packages are published in the public repository
 |---|---|---|
 | Linux amd64 (arm64: `make package-linux` on an arm64 host) | `.AppImage`, `.deb`, `.rpm`, `.tar.gz` | glibc ≥ 2.34 (Ubuntu 22.04+, Debian 12+, Fedora 35+); Wayland or X11 |
 | Windows 10+ amd64/arm64 | portable `.zip` (`kubeon.exe`) | unsigned: SmartScreen asks once ("More info → Run anyway") |
-| macOS 12+ (universal) | `.dmg`, `.zip` | ad-hoc signed unless built with a Developer ID: first launch via right-click → Open, or `xattr -dr com.apple.quarantine /Applications/kubeon.app` |
+| macOS 12+ (universal) | `.dmg`, `.zip` | ad-hoc signed unless built with a Developer ID: first launch via right-click → Open, or `xattr -dr com.apple.quarantine /Applications/Kubeon.app` |
 
-kubeon reads `$KUBECONFIG` / `~/.kube/config` like kubectl. Started from a desktop
+Kubeon reads `$KUBECONFIG` / `~/.kube/config` like kubectl. Started from a desktop
 launcher (Finder, Dock, app menu) it loads the login shell environment first, so
 exec credential plugins (`aws`, `gke-gcloud-auth-plugin`, `kubelogin`, …) on your
 shell `PATH` work. `kubeon --version` prints the version.
@@ -81,11 +81,11 @@ verifies it and replaces this copy in place, then restarts:
 
 | Installed as | Update |
 |---|---|
-| AppImage, `tar.gz` binary, portable Windows `kubeon.exe`, macOS `kubeon.app` | in place, when the location is writable |
+| AppImage, `tar.gz` binary, portable Windows `kubeon.exe`, macOS `Kubeon.app` | in place, when the location is writable |
 | `.deb` / `.rpm` (in `/usr`) | release page link: update with the package manager |
 
 Every download must match `SHA256SUMS.txt`, and that file must carry a valid
-ed25519 signature (`SHA256SUMS.txt.sig`) from the kubeon release key whose
+ed25519 signature (`SHA256SUMS.txt.sig`) from the Kubeon release key whose
 public half is built into the app (`internal/update`). Unsigned or foreign
 releases are never installed. CI signs releases with the secret
 `UPDATE_SIGNING_KEY` (`go run ./scripts/signsums keygen <file>` creates a key
@@ -97,11 +97,11 @@ longer update themselves). Dev builds never check for updates.
 
 Every package ships `THIRD_PARTY_NOTICES.txt` (`make notices`): the license of
 each linked dependency, the vendored k9s (Apache-2.0) and Gio (Unlicense)
-with the list of kubeon's modifications, and the MPL-2.0 source note.
+with the list of Kubeon's modifications, and the MPL-2.0 source note.
 
 ## Window chrome
 
-kubeon draws its own title bar (brand, namespace, centered command search,
+Kubeon draws its own title bar (brand, namespace, centered command search,
 window controls). Gio is vendored in `third_party/gio` with small patches
 (`third_party/_gio-patches`, re-apply with `scripts/vendor-gio.sh`):
 
@@ -131,7 +131,7 @@ Everything lands in `dist/`; the version comes from `git describe` (override wit
 make icons            # packaging/icons (png/ico/icns) + internal/ui/assets/logo.png from packaging/logo-source.png
 make package-linux    # Docker (Ubuntu 22.04 + full Gio deps): AppImage, deb, rpm, tar.gz for the host arch
 make package-windows  # cross-compiled from any OS (pure Go): zips for amd64 + arm64, icon/manifest/version via go-winres
-make package-macos    # on a Mac: universal kubeon.app (arm64+amd64), dmg, zip
+make package-macos    # on a Mac: universal Kubeon.app (arm64+amd64), dmg, zip
 ```
 
 macOS signing/notarization is optional: `MACOS_SIGN_IDENTITY="Developer ID Application: …"`

@@ -166,7 +166,7 @@ jobs:
       - name: smoke test (start, must stay up)
         run: |
           printf 'apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\nusers: []\n' > "$RUNNER_TEMP/empty-kubeconfig"
-          dist/macos/kubeon.app/Contents/MacOS/kubeon --kubeconfig "$RUNNER_TEMP/empty-kubeconfig" </dev/null &
+          dist/macos/Kubeon.app/Contents/MacOS/kubeon --kubeconfig "$RUNNER_TEMP/empty-kubeconfig" </dev/null &
           pid=$!
           sleep 15
           kill -0 $pid || { wait $pid; echo "kubeon exited early with $?"; exit 1; }
@@ -233,5 +233,5 @@ jobs:
             exit 1
           fi
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$RELEASES_REPO" --target main \
-            --title "kubeon ${GITHUB_REF_NAME#v}" --notes-file notes.md \
+            --title "Kubeon ${GITHUB_REF_NAME#v}" --notes-file notes.md \
             $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)

@@ -204,7 +204,7 @@ func (t *TitleBar) Layout(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D { return t.logo(gtx) }),
 			layout.Rigid(layout.Spacer{Width: 10}.Layout),
-			layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, "kubeon") }),
+			layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontSans, 14, fg, AppName) }),
 		)
 	})
 	st.Pop()
@@ -269,7 +269,7 @@ func keyChip(gtx C, th *material.Theme, k string) D {
 	})
 }
 
-// logo draws the kubeon mark (the app icon tile).
+// logo draws the Kubeon mark (the app icon tile).
 func (t *TitleBar) logo(gtx C) D { return drawLogo(gtx, 24) }
 
 type winGlyph int

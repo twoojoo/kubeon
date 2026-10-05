@@ -305,9 +305,16 @@ func replaceApp(archive, app string) error {
 	if err := unzipAll(archive, stage); err != nil {
 		return err
 	}
-	fresh := filepath.Join(stage, "kubeon.app")
-	if _, err := os.Stat(filepath.Join(fresh, "Contents", "MacOS", "kubeon")); err != nil {
-		return errors.New("kubeon.app not found in the archive")
+	// Kubeon.app (kubeon.app in the first releases)
+	var fresh string
+	for _, n := range []string{"Kubeon.app", "kubeon.app"} {
+		if _, err := os.Stat(filepath.Join(stage, n, "Contents", "MacOS", "kubeon")); err == nil {
+			fresh = filepath.Join(stage, n)
+			break
+		}
+	}
+	if fresh == "" {
+		return errors.New("Kubeon.app not found in the archive")
 	}
 	old := filepath.Join(stage, "previous.app")
 	if err := os.Rename(app, old); err != nil {
@@ -395,5 +402,5 @@ func Restart(p Plan) error {
 	case KindAppImage, KindTarball:
 		return syscall.Exec(p.Target, append([]string{p.Target}, args...), os.Environ())
 	}
-	return errors.New("restart kubeon to use the new version")
+	return errors.New("restart Kubeon to use the new version")
 }

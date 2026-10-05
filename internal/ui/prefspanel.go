@@ -110,7 +110,7 @@ func (p *PrefsPanel) Layout(gtx C) D {
 				layout.Rigid(func(gtx C) D {
 					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 						layout.Flexed(1, func(gtx C) D { return iconText(gtx, th, icSettings, 16, pal.TextBright, "Preferences") }),
-						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontMono, 11, pal.TextDim, "kubeon "+Version) }),
+						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontMono, 11, pal.TextDim, AppName+" "+Version) }),
 						layout.Rigid(layout.Spacer{Width: 10}.Layout),
 						layout.Rigid(func(gtx C) D { return iconOnly(gtx, &p.closeBtn, icClose, 16) }),
 					)

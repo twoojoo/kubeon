@@ -1,4 +1,4 @@
-# kubeon — notes for Claude
+# Kubeon — notes for Claude
 
 Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
 

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=kubeon
+Name=Kubeon
 GenericName=Kubernetes IDE
 Comment=Native Kubernetes IDE powered by the k9s engine
 Exec=kubeon %U

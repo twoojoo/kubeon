@@ -11,7 +11,7 @@
           "name": "kubeon",
           "version": ""
         },
-        "description": "kubeon — native Kubernetes IDE",
+        "description": "Kubeon — native Kubernetes IDE",
         "minimum-os": "win10",
         "execution-level": "as invoker",
         "ui-access": false,
@@ -38,13 +38,13 @@
         },
         "info": {
           "0409": {
-            "CompanyName": "kubeon",
-            "FileDescription": "kubeon",
+            "CompanyName": "Kubeon",
+            "FileDescription": "Kubeon",
             "FileVersion": "",
             "InternalName": "kubeon",
             "LegalCopyright": "",
             "OriginalFilename": "kubeon.exe",
-            "ProductName": "kubeon",
+            "ProductName": "Kubeon",
             "ProductVersion": ""
           }
         }

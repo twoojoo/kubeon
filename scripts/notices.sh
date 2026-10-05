@@ -17,11 +17,11 @@ patches() { for p in "$1"/*.patch; do echo "  - $(basename "$p")"; done; }
 
 {
   cat <<HDR
-kubeon — third-party notices
+Kubeon — third-party notices
 ============================
 
-kubeon includes software developed by third parties under the licenses
-reproduced below. None of them is copyleft for kubeon's own code; files
+Kubeon includes software developed by third parties under the licenses
+reproduced below. None of them is copyleft for Kubeon's own code; files
 under the MPL-2.0 are used unmodified.
 
 Modified components
@@ -34,7 +34,7 @@ $(patches third_party/_k9s-patches)
   vendored in third_party/gio with these changes:
 $(patches third_party/_gio-patches)
 
-"k9s" is a project of its authors; kubeon is not affiliated with or
+"k9s" is a project of its authors; Kubeon is not affiliated with or
 endorsed by it.
 
 MPL-2.0 components

@@ -71,7 +71,7 @@ func (a *App) checkUpdates(manual bool) {
 				}
 			case rel == nil:
 				if manual {
-					a.flash("kubeon "+Version+" is up to date", false)
+					a.flash(AppName+" "+Version+" is up to date", false)
 				}
 			default:
 				a.upd.rel, a.upd.plan, a.upd.err = rel, plan, ""
@@ -160,7 +160,7 @@ func (d *UpdateDialog) Layout(gtx C) D {
 		return inset(18).Layout(gtx, func(gtx C) D {
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx C) D {
-					return iconText(gtx, th, icDownload, 16, pal.TextBright, "kubeon "+u.rel.Version+" is available")
+					return iconText(gtx, th, icDownload, 16, pal.TextBright, AppName+" "+u.rel.Version+" is available")
 				}),
 				layout.Rigid(func(gtx C) D {
 					return layout.Inset{Top: 4, Bottom: 10}.Layout(gtx, func(gtx C) D {
@@ -189,7 +189,7 @@ func (d *UpdateDialog) Layout(gtx C) D {
 						case u.err != "":
 							msg, c = "Update failed: "+u.err, pal.Err
 						case u.ready:
-							msg, c = "Installed. Restart kubeon to use "+u.rel.Version+" (shells and port-forwards are closed; pinned forwards reopen).", pal.Ok
+							msg, c = "Installed. Restart "+AppName+" to use "+u.rel.Version+" (shells and port-forwards are closed; pinned forwards reopen).", pal.Ok
 						case u.downloading && u.total > 0:
 							msg = fmt.Sprintf("Downloading… %s / %s", mb(u.done), mb(u.total))
 						case u.downloading:

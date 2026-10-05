@@ -2,6 +2,10 @@ package ui
 
 import "runtime"
 
+// AppName is the product name shown to users (binary, packages and
+// directories stay lowercase "kubeon").
+const AppName = "Kubeon"
+
 // nativeWindowControls is true where the OS draws the window buttons over
 // our titlebar (macOS traffic lights, see third_party/_gio-patches).
 var nativeWindowControls = runtime.GOOS == "darwin"

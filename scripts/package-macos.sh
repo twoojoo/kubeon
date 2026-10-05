@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Builds the macOS release on a Mac (Gio needs cgo + the Apple SDK): arm64 and
-# amd64 binaries merged into a universal kubeon.app, packed as .dmg and .zip
+# amd64 binaries merged into a universal Kubeon.app, packed as .dmg and .zip
 # in dist/.
 #
 # Signing: ad-hoc by default (runs after "Open" in System Settings or
-# `xattr -dr com.apple.quarantine kubeon.app`). With a Developer ID:
+# `xattr -dr com.apple.quarantine Kubeon.app`). With a Developer ID:
 #   MACOS_SIGN_IDENTITY="Developer ID Application: …"   sign with hardened runtime
 #   MACOS_NOTARY_PROFILE=<keychain profile>              also notarize + staple
 #     (xcrun notarytool store-credentials <profile> …)
@@ -18,7 +18,7 @@ source "$ROOT/scripts/version.sh"
 VERSION="$(kubeon_version)"
 DIST="${DIST:-dist}"
 OUT="$DIST/macos"
-APP="$OUT/kubeon.app"
+APP="$OUT/Kubeon.app"
 export MACOSX_DEPLOYMENT_TARGET=12.0 # Go 1.25 needs macOS 12+
 
 rm -rf "$OUT"
@@ -33,7 +33,7 @@ for arch in arm64 amd64; do
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "$OUT/kubeon-$arch" ./cmd/kubeon
 done
 
-echo "==> kubeon.app (universal)"
+echo "==> Kubeon.app (universal)"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 lipo -create -output "$APP/Contents/MacOS/kubeon" "$OUT/kubeon-arm64" "$OUT/kubeon-amd64"
 rm "$OUT/kubeon-arm64" "$OUT/kubeon-amd64"
@@ -60,7 +60,7 @@ cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 DMG="$DIST/kubeon-$VERSION-macos-universal.dmg"
 rm -f "$DMG"
-hdiutil create -volname "kubeon $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
+hdiutil create -volname "Kubeon $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
 rm -rf "$STAGE"
 if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
   codesign --force --timestamp -s "$MACOS_SIGN_IDENTITY" "$DMG"
@@ -71,5 +71,5 @@ if [[ -n "${MACOS_SIGN_IDENTITY:-}" && -n "${MACOS_NOTARY_PROFILE:-}" ]]; then
   xcrun stapler staple "$DMG"
   xcrun stapler staple "$APP"
 fi
-(cd "$OUT" && ditto -c -k --keepParent kubeon.app "../kubeon-$VERSION-macos-universal.zip")
+(cd "$OUT" && ditto -c -k --keepParent Kubeon.app "../kubeon-$VERSION-macos-universal.zip")
 ls -la "$DIST"

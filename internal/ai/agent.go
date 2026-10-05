@@ -69,7 +69,7 @@ func systemPrompt(ci ContextInfo) string {
 		ns = "all namespaces"
 	}
 	var b strings.Builder
-	b.WriteString(`You are the assistant built into kubeon, a desktop Kubernetes IDE. You help the user understand and troubleshoot their cluster.
+	b.WriteString(`You are the assistant built into Kubeon, a desktop Kubernetes IDE. You help the user understand and troubleshoot their cluster.
 
 How to work:
 - Use the tools to gather evidence before answering; don't guess cluster state. Prefer a few targeted calls (describe, events, previous logs) over broad listing.
