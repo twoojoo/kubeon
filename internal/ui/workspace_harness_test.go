@@ -226,3 +226,49 @@ func TestUIWorkspace(t *testing.T) {
 	})
 	_ = dir
 }
+
+// Protected contexts ask before opening a tunnel; pinned tunnels restored on
+// connect are announced in the notification bell.
+func TestUIProtectedTunnels(t *testing.T) {
+	isolatedPrefs(t)
+	const ctx = "kind-kubeon-dev"
+	p := prefs.Load()
+	p.SetPolicy(ctx, true, false)
+	p.SavePortForward(prefs.PortForward{Context: ctx, GVR: "apps/v1/deployments", Path: "demo/web", Remote: 8080, AutoStart: true})
+	if err := p.Save(); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, Options{Namespace: "demo", Resource: "deploy"})
+	a := h.a
+	h.waitFor("tunnel announced", func() bool {
+		for _, e := range a.events {
+			if strings.HasPrefix(e.Title, "Tunnels opened on "+ctx) {
+				return true
+			}
+		}
+		return false
+	})
+	started := false
+	a.confirmForward("demo/web", 8080, func() { started = true })
+	c, ok := a.overlay.(*Confirm)
+	if !ok || started {
+		t.Fatalf("protected: expected a confirmation first (overlay %T, started %v)", a.overlay, started)
+	}
+	h.settle(80 * time.Millisecond)
+	h.shot("60-protected-tunnel")
+	c.onOK(nil)
+	if !started {
+		t.Fatal("confirmed tunnel not started")
+	}
+	a.overlay = nil
+	for _, f := range a.cluster.PortForwards() {
+		a.cluster.StopPortForward(f.ID)
+	}
+	// unprotected: no dialog
+	a.prefs.SetPolicy(ctx, false, true) // read-only still allows tunnels
+	started = false
+	a.confirmForward("demo/web", 8080, func() { started = true })
+	if !started || a.overlay != nil {
+		t.Fatal("read-only, unprotected context must open tunnels directly")
+	}
+}

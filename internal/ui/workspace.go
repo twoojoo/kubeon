@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"strings"
+	"time"
 
 	"gioui.org/layout"
 	"gioui.org/widget"
@@ -19,24 +20,59 @@ import (
 // openBrowser opens url with the desktop handler.
 func openBrowser(url string) error { return desktop.Open(url) }
 
-// startSavedForwards re-opens the auto-start forwards of the context.
+// startSavedForwards re-opens the auto-start forwards of the context. They
+// start without confirmation (the user pinned them) but are announced in one
+// summary; on protected contexts also in the notification bell.
 func (a *App) startSavedForwards(c *backend.Cluster) {
+	var todo []prefs.PortForward
 	for _, f := range a.prefs.SavedForwards(c.Context) {
-		if !f.AutoStart {
-			continue
+		if f.AutoStart {
+			todo = append(todo, f)
 		}
-		f := f
-		go func() {
-			_, err := c.PortForward(f.GVR, f.Path, f.Local, f.Remote)
-			a.post(func() {
-				if err != nil {
-					a.flash(fmt.Sprintf("saved port-forward %s :%d failed: %v", f.Path, f.Local, err), true)
-					return
-				}
-				a.flash(fmt.Sprintf("Restored port-forward localhost:%d → %s:%d", f.Local, f.Path, f.Remote), false)
-			})
-		}()
 	}
+	if len(todo) == 0 {
+		return
+	}
+	go func() {
+		var opened, failed []string
+		for _, f := range todo {
+			if pf, err := c.PortForward(f.GVR, f.Path, f.Local, f.Remote); err != nil {
+				failed = append(failed, fmt.Sprintf("%s:%d (%v)", f.Path, f.Remote, err))
+			} else {
+				opened = append(opened, pf.String())
+			}
+		}
+		a.post(func() {
+			if a.cluster != c {
+				return
+			}
+			if len(failed) > 0 {
+				a.flash("Pinned port-forwards failed: "+strings.Join(failed, "; "), true)
+			}
+			if len(opened) == 0 {
+				return
+			}
+			msg := fmt.Sprintf("Opened %d pinned tunnel(s): %s", len(opened), strings.Join(opened, ", "))
+			if a.protected() {
+				a.onHealth([]backend.HealthEvent{{Severity: backend.SevWarn, Title: "Tunnels opened on " + c.Context,
+					Body: strings.Join(opened, "\n"), At: time.Now()}})
+			}
+			a.flash(msg, false)
+		})
+	}()
+}
+
+// confirmForward opens a tunnel; on protected contexts it asks first (no
+// typed name: a tunnel changes nothing in the cluster, the risk is opening
+// one into production by mistake). Read-only contexts allow forwards.
+func (a *App) confirmForward(path string, remote int, start func()) {
+	if !a.protected() {
+		start()
+		return
+	}
+	a.overlay = newConfirm(a, "Open tunnel",
+		fmt.Sprintf("Open a tunnel to %s:%d on %s?\n\nTraffic through it reaches the cluster directly.", path, remote, a.cluster.Context),
+		false, func(bool) { start() })
 }
 
 // pfRow merges an active forward and/or its saved entry.
@@ -134,15 +170,18 @@ func (p *PortForwardPanel) Layout(gtx C) D {
 				c.StopPortForward(r.active.ID)
 				p.reload()
 			} else {
-				go func() {
-					_, err := c.PortForward(gvr, path, local, remote)
-					a.post(func() {
-						if err != nil {
-							a.flash("port-forward: "+err.Error(), true)
-						}
-						p.reload()
-					})
-				}()
+				a.confirmForward(path, remote, func() {
+					a.overlay = p // back to the panel after a confirmation
+					go func() {
+						_, err := c.PortForward(gvr, path, local, remote)
+						a.post(func() {
+							if err != nil {
+								a.flash("port-forward: "+err.Error(), true)
+							}
+							p.reload()
+						})
+					}()
+				})
 			}
 		}
 		if r.remove.Clicked(gtx) {

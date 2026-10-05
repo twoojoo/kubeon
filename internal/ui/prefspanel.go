@@ -128,7 +128,7 @@ func (p *PrefsPanel) Layout(gtx C) D {
 				items = append(items,
 					section("SAFETY FOR CONTEXT "+upper(ctx)),
 					layout.Rigid(func(gtx C) D {
-						return toggle(gtx, th, &p.protBtn, "Protected (production): red frame, type the name to confirm changes", a.prefs.Protected(ctx))
+						return toggle(gtx, th, &p.protBtn, "Protected (production): red frame, type the name to confirm changes, confirm tunnels", a.prefs.Protected(ctx))
 					}),
 					layout.Rigid(func(gtx C) D {
 						note := "set explicitly"
@@ -140,7 +140,7 @@ func (p *PrefsPanel) Layout(gtx C) D {
 						})
 					}),
 					layout.Rigid(func(gtx C) D {
-						return toggle(gtx, th, &p.roBtn, "Read-only: block edits, deletes, scaling, shells and assistant actions", a.prefs.ReadOnly(ctx))
+						return toggle(gtx, th, &p.roBtn, "Read-only: block edits, deletes, scaling, shells and assistant actions (port-forwards stay allowed)", a.prefs.ReadOnly(ctx))
 					}),
 					section("PORT-FORWARDS"),
 					layout.Rigid(func(gtx C) D {

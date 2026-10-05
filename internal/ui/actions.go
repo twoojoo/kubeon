@@ -413,17 +413,22 @@ func (v *ResourceView) portForward() {
 					a.flash("invalid ports, use local:remote", true)
 					return
 				}
-				a.flash("Port-forward "+path+"…", false)
-				go func() {
-					pf, err := c.PortForward(gvr, path, l, rr)
-					a.post(func() {
-						if err != nil {
-							a.flash("port-forward failed: "+err.Error(), true)
-							return
-						}
-						a.flash("Forwarding "+pf.String(), false)
-					})
-				}()
+				a.confirmForward(path, rr, func() {
+					if a.stale(c) {
+						return
+					}
+					a.flash("Port-forward "+path+"…", false)
+					go func() {
+						pf, err := c.PortForward(gvr, path, l, rr)
+						a.post(func() {
+							if err != nil {
+								a.flash("port-forward failed: "+err.Error(), true)
+								return
+							}
+							a.flash("Forwarding "+pf.String(), false)
+						})
+					}()
+				})
 			})
 			p.exact = func(s string) bool { return strings.Contains(s, ":") }
 			a.overlay = p

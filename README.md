@@ -22,7 +22,7 @@ Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
 | Secrets | Decoded data tab, per-key reveal/copy, copy all as `.env`, download `.env` (mode 600) |
 | Helm | Releases, history (enter), values (user/computed), rollback, uninstall |
 | XRay | k9s dependency tree for deploy/sts/ds/rs/svc/pods as collapsible tree or pannable graph |
-| Safety | Per-context policies: **protected** (auto-detected for names like `prod`/`production`/`prd`/`live`) adds a red frame, a PRODUCTION badge and type-the-name confirmation for every change; **read-only** blocks edits, deletes, scaling, shells and assistant actions |
+| Safety | Per-context policies: **protected** (auto-detected for names like `prod`/`production`/`prd`/`live`) adds a red frame, a PRODUCTION badge and type-the-name confirmation for every change, and asks before opening a port-forward tunnel (pinned tunnels restored on connect are listed in the notification bell); **read-only** blocks edits, deletes, scaling, shells and assistant actions — port-forwards stay allowed: they change nothing in the cluster (Kubernetes RBAC on `pods/portforward` still applies) |
 | Selection | Ctrl+click, Shift+click, `space`, Ctrl+A; bulk delete/restart/cordon with one confirmation; right-click context menu with every action for the row (or the selection) |
 | Workspace | Tabs (Ctrl+T / Ctrl+W / Ctrl+Tab), bookmarks of resource+namespace+filter (`m`, sidebar section, `:bm`), port-forward manager with pinned forwards restored on connect and open-in-browser |
 | Appearance | Dark and light themes (title bar toggle, `:theme`), preferences panel (Ctrl+, or gear) |
