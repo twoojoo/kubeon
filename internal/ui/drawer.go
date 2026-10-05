@@ -67,7 +67,7 @@ type Drawer struct {
 func newDrawer(a *App) *Drawer {
 	d := Drawer{app: a, revealed: map[string]bool{}, drafts: map[string]string{}, keyCopy: map[string]*widget.Clickable{}, keyEye: map[string]*widget.Clickable{}}
 	d.detV = newDetailsView(a)
-	d.yamlV, d.valV = newYAMLView(), newYAMLView()
+	d.yamlV, d.valV = newYAMLView(a), newYAMLView(a)
 	d.describe.ReadOnly = true
 	d.yaml.ReadOnly = true
 	d.values.ReadOnly = true
@@ -519,12 +519,7 @@ func (d *Drawer) layoutSecret(gtx C) D {
 								case shown:
 									v, c = string(e.Value), pal.Ok
 								}
-								l := material.Body2(th, v)
-								l.Font = fontMono
-								l.TextSize = 12
-								l.Color = c
-								l.MaxLines = 12
-								return l.Layout(gtx)
+								return d.app.selText(gtx, "secret/"+d.path+"/"+e.Key, fontMono, 12, c, v, 12)
 							}),
 						)
 					})

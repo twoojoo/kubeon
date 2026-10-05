@@ -107,6 +107,9 @@ func inlineSpans(s string, size unit.Sp, c colorNRGBA) []richtext.SpanStyle {
 type mdView struct {
 	rt    richtext.InteractiveText
 	codes []widget.Clickable
+	// app and id make code blocks selectable (optional)
+	app *App
+	id  string
 }
 
 func (m *mdView) layout(gtx C, th *material.Theme, blocks []mdBlock, c colorNRGBA, onCopy func(string)) D {
@@ -137,6 +140,9 @@ func (m *mdView) layout(gtx C, th *material.Theme, blocks []mdBlock, c colorNRGB
 									)
 								}),
 								layout.Rigid(func(gtx C) D {
+									if m.app != nil {
+										return m.app.selText(gtx, m.id+"/code/"+itoa(i), fontMono, 11.5, pal.Text, b.text, 0)
+									}
 									l := material.Body2(th, b.text)
 									l.Font = fontMono
 									l.TextSize = 11.5

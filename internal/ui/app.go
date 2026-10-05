@@ -79,14 +79,19 @@ type App struct {
 	dock                   *Dock
 	overlay                overlay
 
-	ctxBtn  widget.Clickable
-	pfBtn   widget.Clickable
-	bellBtn widget.Clickable
-	updBtn  widget.Clickable
-	upd     updState
-	tip     tooltip
-	tipTags map[string]*tipTag
-	frame   uint64
+	ctxBtn        widget.Clickable
+	pfBtn         widget.Clickable
+	bellBtn       widget.Clickable
+	updBtn        widget.Clickable
+	upd           updState
+	tip           tooltip
+	tipTags       map[string]*tipTag
+	frame         uint64
+	sels          map[string]*selState
+	selFocused    bool        // a selectable text has the keyboard focus (this frame)
+	selWasFocused bool        // … in the previous frame (keys are handled first)
+	lineSel       *lineSelect // line selection with the focus (this frame)
+	lineSelPrev   *lineSelect
 
 	events       []backend.HealthEvent
 	unread       int
@@ -121,7 +126,7 @@ func Run(opts Options) error {
 }
 
 func newApp(opts Options, w *app.Window) *App {
-	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load(), tipTags: map[string]*tipTag{}}
+	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load(), tipTags: map[string]*tipTag{}, sels: map[string]*selState{}}
 	setTheme(a.th, a.prefs.Theme)
 	if w != nil {
 		a.notifier = notify.New(AppName)
@@ -349,6 +354,8 @@ func (a *App) textFocused(gtx C) bool {
 
 func (a *App) layout(gtx C) {
 	a.frame++
+	a.selWasFocused, a.selFocused = a.selFocused, false
+	a.lineSelPrev, a.lineSel = a.lineSel, nil
 	fill(gtx, pal.Bg)
 	if a.overlay != nil && a.overlay.Done() {
 		a.overlay = nil
@@ -401,6 +408,7 @@ func (a *App) layout(gtx C) {
 		a.layoutModal(gtx)
 	}
 	a.layoutTooltip(gtx)
+	a.pruneSels()
 }
 
 // layoutModal draws the active overlay over a dimmed backdrop. A click on
@@ -543,9 +551,7 @@ func (a *App) layoutWelcome(gtx C) D {
 					return lbl(gtx, a.th, fontSans, 15, pal.Text, "Connecting to "+a.connecting+"…")
 				case a.connErr != nil:
 					gtx.Constraints.Max.X = gtx.Dp(700)
-					l := material.Body1(a.th, a.connErr.Error())
-					l.Color = pal.Err
-					return l.Layout(gtx)
+					return a.selText(gtx, "connErr", fontSans, 16, pal.Err, a.connErr.Error(), 0)
 				default:
 					return lbl(gtx, a.th, fontSans, 15, pal.Text, "Select a context")
 				}

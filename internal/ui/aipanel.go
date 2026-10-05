@@ -140,6 +140,7 @@ func (p *AIPanel) contextInfo() ai.ContextInfo {
 }
 
 func (p *AIPanel) add(it *chatItem) *chatItem {
+	it.md.app, it.md.id = p.app, fmt.Sprintf("ai/%p/md", it)
 	it.dirty = true
 	p.items = append(p.items, it)
 	return it
@@ -437,10 +438,7 @@ func (p *AIPanel) layoutItem(gtx C, it *chatItem) D {
 			gtx.Constraints.Max.X = gtx.Constraints.Max.X * 85 / 100
 			return rbg(gtx, pal.Selected, 10, func(gtx C) D {
 				return insetHV(11, 8).Layout(gtx, func(gtx C) D {
-					l := material.Body2(th, it.text)
-					l.Color = pal.TextBright
-					l.TextSize = 13
-					return l.Layout(gtx)
+					return p.app.selText(gtx, fmt.Sprintf("ai/%p/user", it), fontSans, 13, pal.TextBright, it.text, 0)
 				})
 			})
 		})
@@ -469,10 +467,7 @@ func (p *AIPanel) layoutItem(gtx C, it *chatItem) D {
 					layout.Rigid(func(gtx C) D { return mdi(gtx, icError, pal.Err, 16) }),
 					layout.Rigid(layout.Spacer{Width: 8}.Layout),
 					layout.Flexed(1, func(gtx C) D {
-						l := material.Body2(th, it.text)
-						l.Color = lighten(pal.Err, 0.3)
-						l.TextSize = 12.5
-						return l.Layout(gtx)
+						return p.app.selText(gtx, fmt.Sprintf("ai/%p/err", it), fontSans, 12.5, lighten(pal.Err, 0.3), it.text, 0)
 					}),
 				)
 			})
@@ -541,10 +536,7 @@ func (p *AIPanel) layoutTool(gtx C, it *chatItem) D {
 				return rbg(gtx, pal.CodeBg, 6, func(gtx C) D {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					return inset(8).Layout(gtx, func(gtx C) D {
-						l := material.Body2(th, out)
-						l.Font, l.TextSize, l.Color = fontMono, 11, pal.TextDim
-						l.MaxLines = 40
-						return l.Layout(gtx)
+						return p.app.selText(gtx, fmt.Sprintf("ai/%p/out", it), fontMono, 11, pal.TextDim, out, 40)
 					})
 				})
 			})
@@ -595,9 +587,9 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 					if pr.Reason == "" {
 						return D{}
 					}
-					l := material.Body2(th, pr.Reason)
-					l.Color, l.TextSize = pal.Text, 12
-					return layout.Inset{Top: 6}.Layout(gtx, l.Layout)
+					return layout.Inset{Top: 6}.Layout(gtx, func(gtx C) D {
+						return p.app.selText(gtx, fmt.Sprintf("ai/%p/reason", it), fontSans, 12, pal.Text, pr.Reason, 0)
+					})
 				}),
 				layout.Rigid(func(gtx C) D {
 					if pr.Manifest == "" {
@@ -607,9 +599,7 @@ func (p *AIPanel) layoutProposal(gtx C, it *chatItem) D {
 						return rbg(gtx, pal.CodeBg, 6, func(gtx C) D {
 							gtx.Constraints.Min.X = gtx.Constraints.Max.X
 							return inset(8).Layout(gtx, func(gtx C) D {
-								l := material.Body2(th, pr.Manifest)
-								l.Font, l.TextSize, l.Color, l.MaxLines = fontMono, 11, pal.Text, 18
-								return l.Layout(gtx)
+								return p.app.selText(gtx, fmt.Sprintf("ai/%p/manifest", it), fontMono, 11, pal.Text, pr.Manifest, 18)
 							})
 						})
 					})

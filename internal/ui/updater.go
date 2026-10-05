@@ -96,6 +96,7 @@ type UpdateDialog struct {
 
 func newUpdateDialog(a *App) *UpdateDialog {
 	d := &UpdateDialog{app: a, blocks: parseMarkdown(a.upd.rel.Notes)}
+	d.md.app, d.md.id = a, "update-notes"
 	d.list.Axis = layout.Vertical
 	return d
 }

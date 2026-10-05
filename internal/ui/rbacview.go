@@ -523,15 +523,15 @@ func (v *RBACView) layoutRule(gtx C, i int, er backend.EffectiveRule) D {
 	return layout.Inset{Top: 5, Bottom: 5}.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Flexed(1.2, func(gtx C) D {
-				return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/scope", i), fontSans, 12, pal.TextDim, scope)
+				return v.app.selLbl(gtx, fmt.Sprintf("rbac/r%d/scope", i), fontSans, 12, pal.TextDim, scope)
 			}),
 			layout.Flexed(1.6, func(gtx C) D {
-				return v.app.tipLbl(gtx, fmt.Sprintf("rbac/r%d/verbs", i), fontMono, 11.5, verbC, verbs)
+				return v.app.selLbl(gtx, fmt.Sprintf("rbac/r%d/verbs", i), fontMono, 11.5, verbC, verbs)
 			}),
 			layout.Flexed(3, func(gtx C) D {
-				l := material.Body2(th, res)
-				l.Font, l.TextSize, l.Color, l.MaxLines = fontMono, 11.5, pal.Text, 3
-				return layout.Inset{Right: 8}.Layout(gtx, l.Layout)
+				return layout.Inset{Right: 8}.Layout(gtx, func(gtx C) D {
+					return v.app.selText(gtx, fmt.Sprintf("rbac/r%d/res", i), fontMono, 11.5, pal.Text, res, 3)
+				})
 			}),
 			layout.Flexed(2.6, func(gtx C) D {
 				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,

@@ -239,10 +239,10 @@ func (p *PortForwardPanel) layoutRow(gtx C, r *pfRow) D {
 					layout.Flexed(1, func(gtx C) D {
 						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 							layout.Rigid(func(gtx C) D {
-								return lbl(gtx, th, fontMono, 12.5, pal.TextBright, fmt.Sprintf("localhost:%d → :%d", local, remote))
+								return p.app.selLbl(gtx, fmt.Sprintf("pf/%s/%s/%d", gvr, path, remote), fontMono, 12.5, pal.TextBright, fmt.Sprintf("localhost:%d → :%d", local, remote))
 							}),
 							layout.Rigid(func(gtx C) D {
-								return lbl(gtx, th, fontSans, 11, pal.TextDim, singular(strings.ToLower(titleFor(gvr)))+" "+path+" · "+st)
+								return p.app.selLbl(gtx, fmt.Sprintf("pf/%s/%s/%d/sub", gvr, path, remote), fontSans, 11, pal.TextDim, singular(strings.ToLower(titleFor(gvr)))+" "+path+" · "+st)
 							}),
 						)
 					}),

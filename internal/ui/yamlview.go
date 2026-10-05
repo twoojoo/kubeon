@@ -43,11 +43,14 @@ type yamlView struct {
 	list      widget.List
 	rt        richtext.InteractiveText
 	highlight map[int]colorNRGBA // optional per-line background (errors)
+	raw       []string
+	sel       *lineSelect
 }
 
-func newYAMLView() *yamlView {
+func newYAMLView(a *App) *yamlView {
 	v := &yamlView{}
 	v.list.Axis = layout.Vertical
+	v.sel = newLineSelect(a, func(i int) string { return v.raw[i] })
 	return v
 }
 
@@ -57,6 +60,8 @@ func (v *yamlView) set(text string) {
 	}
 	v.text = text
 	raw := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	v.raw = raw
+	v.sel.clear()
 	v.lines = make([][]token, len(raw))
 	for i, l := range raw {
 		v.lines[i] = yamlTokens(l)
@@ -64,9 +69,17 @@ func (v *yamlView) set(text string) {
 }
 
 func (v *yamlView) Layout(gtx C, th *material.Theme) D {
-	const size = unit.Sp(12)
 	numW := gtx.Dp(unit.Dp(10 + 7*len(strconv.Itoa(len(v.lines)))))
+	v.sel.begin(gtx, len(v.lines))
+	defer v.sel.end(&v.list)
 	return material.List(th, &v.list).Layout(gtx, len(v.lines), func(gtx C, i int) D {
+		return v.sel.item(gtx, i, func(gtx C) D { return v.line(gtx, th, i, numW) })
+	})
+}
+
+func (v *yamlView) line(gtx C, th *material.Theme, i, numW int) D {
+	const size = unit.Sp(12)
+	{
 		spans := make([]richtext.SpanStyle, 0, len(v.lines[i]))
 		for _, t := range v.lines[i] {
 			if t.text != "" {
@@ -94,7 +107,7 @@ func (v *yamlView) Layout(gtx C, th *material.Theme) D {
 				return d
 			}),
 		)
-	})
+	}
 }
 
 var yamlLineRx = regexp.MustCompile(`line (\d+)`)
@@ -152,6 +165,7 @@ type DiffReview struct {
 	dry      string // "", "running", "ok", or error
 	apply    func()
 	list     widget.List
+	sel      *lineSelect
 
 	applyBtn, cancelBtn widget.Clickable
 }
@@ -160,6 +174,18 @@ type DiffReview struct {
 func newDiffReview(a *App, title, path, gvr, before, after string, apply func()) *DiffReview {
 	r := &DiffReview{app: a, title: title, path: path, apply: apply, dry: "running"}
 	r.list.Axis = layout.Vertical
+	r.sel = newLineSelect(a, func(i int) string {
+		switch l := r.lines[i]; l.op {
+		case opAdd:
+			return "+" + l.text
+		case opDel:
+			return "-" + l.text
+		case opGap:
+			return "…"
+		default:
+			return " " + l.text
+		}
+	})
 	full := lineDiff(strings.Split(strings.TrimRight(before, "\n"), "\n"), strings.Split(strings.TrimRight(after, "\n"), "\n"))
 	r.add, r.del = diffStats(full)
 	r.lines = collapse(full, 3)
@@ -220,8 +246,10 @@ func (r *DiffReview) Layout(gtx C) D {
 							})
 						}
 						return inset(6).Layout(gtx, func(gtx C) D {
+							r.sel.begin(gtx, len(r.lines))
+							defer r.sel.end(&r.list)
 							return material.List(th, &r.list).Layout(gtx, len(r.lines), func(gtx C, i int) D {
-								return r.layoutLine(gtx, r.lines[i])
+								return r.sel.item(gtx, i, func(gtx C) D { return r.layoutLine(gtx, r.lines[i]) })
 							})
 						})
 					})
@@ -236,9 +264,7 @@ func (r *DiffReview) Layout(gtx C) D {
 							case "ok":
 								return iconText(gtx, th, icOK, 12, pal.Ok, "Server-side dry run passed")
 							default:
-								l := material.Body2(th, "Dry run failed: "+r.dry)
-								l.Color, l.TextSize, l.MaxLines = pal.Err, 12, 4
-								return l.Layout(gtx)
+								return a.selText(gtx, "diff/dry", fontSans, 12, pal.Err, "Dry run failed: "+r.dry, 4)
 							}
 						}),
 						layout.Rigid(func(gtx C) D { return pillButton(gtx, th, &r.cancelBtn, nil, "Back", pal.Text, pal.Hover) }),

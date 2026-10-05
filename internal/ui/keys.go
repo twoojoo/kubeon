@@ -176,8 +176,9 @@ func (a *App) escape(gtx C) {
 	case a.overlay != nil:
 		a.overlay = nil
 		gtx.Execute(key.FocusCmd{})
-	case a.textFocused(gtx):
-		gtx.Execute(key.FocusCmd{})
+	case a.textFocused(gtx), a.selWasFocused || a.lineSelActive():
+		gtx.Execute(key.FocusCmd{}) // also drops a text or line selection
+		a.clearLineSels()
 	case a.page != xrayPage && len(a.view.marked) > 0:
 		a.view.clearMarks()
 	case a.drawer.open:

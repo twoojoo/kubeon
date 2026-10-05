@@ -90,9 +90,7 @@ func (d *detailsView) field(gtx C, key string, f backend.Field) D {
 	if f.Value == "" {
 		return lbl(gtx, th, fnt, 12.5, pal.TextDim, "—")
 	}
-	l := material.Body2(th, f.Value)
-	l.Font, l.TextSize, l.Color, l.MaxLines = fnt, 12.5, c, 4
-	return l.Layout(gtx)
+	return d.app.selText(gtx, "det/f/"+key, fnt, 12.5, c, f.Value, 4)
 }
 
 func (d *detailsView) fields(gtx C, key string, ff []backend.Field) D {
@@ -209,7 +207,7 @@ func (d *detailsView) table(gtx C, key string, t *backend.DTable) D {
 					if f.Mono {
 						fnt = fontMono
 					}
-					return d.app.tipLbl(gtx, fmt.Sprintf("det/%s/t%d/%d", key, ri, i), fnt, 12, toneColor(f.Tone, pal.Text), f.Value)
+					return d.app.selLbl(gtx, fmt.Sprintf("det/%s/t%d/%d", key, ri, i), fnt, 12, toneColor(f.Tone, pal.Text), f.Value)
 				}
 			}, false)
 		}))
@@ -252,9 +250,7 @@ func (d *detailsView) section(gtx C, key string, s *backend.Section, card bool) 
 	}
 	if s.Text != "" {
 		ch = append(ch, gap(), layout.Rigid(func(gtx C) D {
-			l := material.Body2(th, s.Text)
-			l.Font, l.TextSize, l.Color = fontMono, 11.5, pal.Text
-			return l.Layout(gtx)
+			return d.app.selText(gtx, "det/text/"+key, fontMono, 11.5, pal.Text, s.Text, 0)
 		}))
 	}
 	for i := range s.Cards {

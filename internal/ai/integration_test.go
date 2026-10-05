@@ -42,7 +42,7 @@ func TestToolsDirect(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct{ name, args, want string }{
 		{"cluster_overview", `{}`, "Nodes: 1/1"},
-		{"list_resources", `{"kind":"po","filter":"crasher"}`, "CrashLoopBackOff"},
+		{"list_resources", `{"kind":"po","filter":"crasher"}`, "crasher-"}, // status flips between Error and CrashLoopBackOff
 		{"get_resource_yaml", `{"kind":"secret","name":"db-creds"}`, "password: <redacted>"},
 		{"describe_resource", `{"kind":"deploy","name":"web"}`, "Replicas"},
 		{"get_events", `{"warnings_only":true}`, "BackOff"},

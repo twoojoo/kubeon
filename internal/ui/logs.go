@@ -66,6 +66,7 @@ type LogView struct {
 	list   widget.List
 	filter widget.Editor
 	rt     richtext.InteractiveText
+	sel    *lineSelect // line selection (copy)
 
 	wrap, timestamps, allContainers, pretty bool
 
@@ -75,6 +76,7 @@ type LogView struct {
 func newLogView(a *App, gvr, path string, previous bool) *LogView {
 	l := LogView{app: a, gvr: gvr, path: path, previous: previous, wrap: true, allContainers: true, pretty: true}
 	l.list.Axis = layout.Vertical
+	l.sel = newLineSelect(a, l.lineText)
 	l.list.ScrollToEnd = true
 	l.filter.SingleLine = true
 	l.start()
@@ -240,6 +242,7 @@ func (l *LogView) setFilter(q string) {
 
 func (l *LogView) rebuildFilter() {
 	l.filtered = l.filtered[:0]
+	l.sel.clear() // indexes change with the filter
 	l.filterOn = l.rx != nil || l.minLevel > 0
 	if !l.filterOn {
 		return
@@ -271,16 +274,23 @@ func (l *LogView) following() bool { return !l.list.Position.BeforeEnd }
 func (l *LogView) export() string {
 	var b strings.Builder
 	for i := 0; i < l.count(); i++ {
-		e := l.at(i)
-		if l.multiPod && e.Pod != "" {
-			b.WriteString("[" + e.Pod + "] ")
-		}
-		if l.multiCo && e.Container != "" {
-			b.WriteString("[" + e.Container + "] ")
-		}
-		b.WriteString(e.Text)
+		b.WriteString(l.lineText(i))
 		b.WriteByte('\n')
 	}
+	return b.String()
+}
+
+// lineText is visible line i as plain text (pod/container prefixes kept).
+func (l *LogView) lineText(i int) string {
+	e := l.at(i)
+	var b strings.Builder
+	if l.multiPod && e.Pod != "" {
+		b.WriteString("[" + e.Pod + "] ")
+	}
+	if l.multiCo && e.Container != "" {
+		b.WriteString("[" + e.Container + "] ")
+	}
+	b.WriteString(e.Text)
 	return b.String()
 }
 
@@ -401,8 +411,10 @@ func (l *LogView) Layout(gtx C) D {
 		layout.Flexed(1, func(gtx C) D {
 			fill(gtx, pal.CodeBg)
 			return layout.Inset{Left: 8, Right: 4}.Layout(gtx, func(gtx C) D {
+				l.sel.begin(gtx, l.count())
+				defer l.sel.end(&l.list)
 				return material.List(th, &l.list).Layout(gtx, l.count(), func(gtx C, i int) D {
-					return l.layoutLine(gtx, l.at(i))
+					return l.sel.item(gtx, i, func(gtx C) D { return l.layoutLine(gtx, l.at(i)) })
 				})
 			})
 		}),
