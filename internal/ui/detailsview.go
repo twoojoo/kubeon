@@ -83,7 +83,7 @@ func (d *detailsView) field(gtx C, key string, f backend.Field) D {
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func(gtx C) D { return mdi(gtx, iconFor(f.Link.GVR), col, 13) }),
 				layout.Rigid(layout.Spacer{Width: 5}.Layout),
-				layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fnt, 12.5, col, f.Value) }),
+				layout.Flexed(1, func(gtx C) D { return d.app.tipLbl(gtx, "det/link/"+key, fnt, 12.5, col, f.Value) }),
 			)
 		})
 	}
@@ -209,7 +209,7 @@ func (d *detailsView) table(gtx C, key string, t *backend.DTable) D {
 					if f.Mono {
 						fnt = fontMono
 					}
-					return lbl(gtx, th, fnt, 12, toneColor(f.Tone, pal.Text), f.Value)
+					return d.app.tipLbl(gtx, fmt.Sprintf("det/%s/t%d/%d", key, ri, i), fnt, 12, toneColor(f.Tone, pal.Text), f.Value)
 				}
 			}, false)
 		}))

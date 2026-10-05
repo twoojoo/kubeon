@@ -51,6 +51,7 @@ type ResourceView struct {
 	marked       map[string]bool
 	bulkBtns     bulkButtons
 	hover        int
+	hoverX       int // pointer x in the rows area (tooltip column)
 	lastClick    time.Time
 	lastClickRow int
 
@@ -675,6 +676,7 @@ func (v *ResourceView) layoutRows(gtx C, s *backend.Snapshot) D {
 		switch pe.Kind {
 		case pointer.Move:
 			v.hover = v.rowAt(pe.Position, rh)
+			v.hoverX = int(pe.Position.X)
 			continue
 		case pointer.Leave, pointer.Cancel:
 			v.hover = -1
@@ -786,6 +788,11 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 			text := func(gtx C) D { return lbl(gtx, th, fontSans, tableText, col, cell) }
 			name := s.Columns[c].Name
 			tone, toned := statusTone(cell)
+			// hovered cell cut with an ellipsis: offer the full text
+			if i == v.hover && v.hoverX >= x && v.hoverX < x+w && !(isStatusCol(name) && toned) &&
+				truncated(gtx, th, fontSans, tableText, cell, w-2*pad) {
+				v.app.hint(v.gvr+"|"+r.ID+"|"+name, cell)
+			}
 			switch {
 			case isStatusCol(name) && toned:
 				layout.W.Layout(cg, func(gtx C) D { return pill(gtx, th, cell, tone) })

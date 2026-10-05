@@ -84,6 +84,9 @@ type App struct {
 	bellBtn widget.Clickable
 	updBtn  widget.Clickable
 	upd     updState
+	tip     tooltip
+	tipTags map[string]*tipTag
+	frame   uint64
 
 	events       []backend.HealthEvent
 	unread       int
@@ -118,7 +121,7 @@ func Run(opts Options) error {
 }
 
 func newApp(opts Options, w *app.Window) *App {
-	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load()}
+	a := App{opts: opts, th: newTheme(), ns: opts.Namespace, w: w, notifyOn: true, prefs: prefs.Load(), tipTags: map[string]*tipTag{}}
 	setTheme(a.th, a.prefs.Theme)
 	if w != nil {
 		a.notifier = notify.New(AppName)
@@ -345,6 +348,7 @@ func (a *App) textFocused(gtx C) bool {
 }
 
 func (a *App) layout(gtx C) {
+	a.frame++
 	fill(gtx, pal.Bg)
 	if a.overlay != nil && a.overlay.Done() {
 		a.overlay = nil
@@ -396,6 +400,7 @@ func (a *App) layout(gtx C) {
 	if a.overlay != nil {
 		a.layoutModal(gtx)
 	}
+	a.layoutTooltip(gtx)
 }
 
 // layoutModal draws the active overlay over a dimmed backdrop. A click on

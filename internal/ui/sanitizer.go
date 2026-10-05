@@ -355,11 +355,11 @@ func (s *SanitizerView) layoutIssue(gtx C, idx int) D {
 							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 								layout.Rigid(func(gtx C) D { return mdi(gtx, iconFor(is.GVR), pal.Accent, 14) }),
 								layout.Rigid(layout.Spacer{Width: 6}.Layout),
-								layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 12.5, pal.Accent, is.Path) }),
+								layout.Flexed(1, func(gtx C) D { return s.app.tipLbl(gtx, "san/"+is.Rule+"/"+is.Path+"/p", fontSans, 12.5, pal.Accent, is.Path) }),
 							)
 						}),
 						layout.Rigid(layout.Spacer{Width: 10}.Layout),
-						layout.Flexed(1, func(gtx C) D { return lbl(gtx, th, fontSans, 12.5, pal.Text, is.Message) }),
+						layout.Flexed(1, func(gtx C) D { return s.app.tipLbl(gtx, "san/"+is.Rule+"/"+is.Path+"/m", fontSans, 12.5, pal.Text, is.Message) }),
 						layout.Rigid(func(gtx C) D { return lbl(gtx, th, fontMono, 10.5, pal.TextDim, is.Rule) }),
 					)
 				})
