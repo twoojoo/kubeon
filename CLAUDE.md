@@ -23,6 +23,8 @@ Native Kubernetes IDE (Lens-like) in Go: Gio UI + vendored k9s engine.
 - Self-update (`internal/update`) installs only releases whose SHA256SUMS.txt verifies with the built-in
   ed25519 public key; the private key is `.dev/update-signing.key` locally and the `UPDATE_SIGNING_KEY`
   repo secret in CI. Never print, commit or regenerate it. Dev builds never update.
+- Packages are published to the public repo `twoojoo/kubeon-releases` (source repo is private); the
+  updater reads its latest release. Creating public repos/surfaces is the user's call.
 - `scripts/notices.sh` builds THIRD_PARTY_NOTICES.txt (k9s is inside our module: added by hand).
 - `make package-linux` (Docker), `make package-windows` (cross, pure Go), `make package-macos` (Mac only;
   never verified locally — CI `macos-14` job is the only check). Output in `dist/`.

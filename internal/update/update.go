@@ -25,9 +25,10 @@ import (
 	"time"
 )
 
-// DefaultURL is the GitHub "latest release" endpoint (drafts and
-// prereleases excluded). KUBEON_UPDATE_URL overrides it.
-const DefaultURL = "https://api.github.com/repos/twoojoo/kubeon/releases/latest"
+// DefaultURL is the "latest release" endpoint of the public repository that
+// hosts the packages (drafts and prereleases excluded); the source
+// repository is private. KUBEON_UPDATE_URL overrides it.
+const DefaultURL = "https://api.github.com/repos/twoojoo/kubeon-releases/releases/latest"
 
 // PublicKey verifies SHA256SUMS.txt.sig (base64 ed25519 public key; its
 // private half signs releases in CI, secret UPDATE_SIGNING_KEY).

@@ -58,7 +58,9 @@ well-formed JSON calls written as text, but larger models give far better answer
 
 ## Install
 
-Release packages (GitHub releases, or build them yourself — see Packaging):
+Release packages are published in the public repository
+[twoojoo/kubeon-releases](https://github.com/twoojoo/kubeon-releases/releases)
+(this source repository is private), or build them yourself — see Packaging:
 
 | OS | Packages | Notes |
 |---|---|---|
@@ -73,7 +75,7 @@ shell `PATH` work. `kubeon --version` prints the version.
 
 ### Updates
 
-Release builds check GitHub releases daily (Preferences → Updates, or *Check
+Release builds check the latest release of `twoojoo/kubeon-releases` daily (Preferences → Updates, or *Check
 now*). A newer version shows in the status bar; *Update now* downloads it,
 verifies it and replaces this copy in place, then restarts:
 
@@ -138,9 +140,13 @@ and `MACOS_NOTARY_PROFILE=<notarytool keychain profile>`. In CI set the secrets
 `MACOS_NOTARY_TEAM_ID`, `MACOS_NOTARY_PASSWORD`.
 
 CI (`.github/workflows/ci.yml`) runs unit tests, the kind integration suite with
-headless UI screenshots, builds every package on Linux (amd64 + arm64), Windows
-and macOS runners with a launch smoke test, and on a `v*` tag publishes them as a
-GitHub release with `SHA256SUMS.txt`.
+headless UI screenshots, builds every package on Linux, Windows and macOS
+runners with a launch smoke test, and on a `v*` tag publishes them, with a
+signed `SHA256SUMS.txt`, as a release of the public `twoojoo/kubeon-releases`
+repository. Secrets: `UPDATE_SIGNING_KEY` (release signing key) and
+`RELEASES_TOKEN` (fine-grained token, Contents read/write on
+`kubeon-releases` only). `packaging/releases-repo/README.md` is that
+repository's README.
 
 ## Development (safe by construction)
 
