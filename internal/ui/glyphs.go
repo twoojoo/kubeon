@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"gioui.org/io/pointer"
 	"image"
 	"strings"
 
@@ -381,4 +382,11 @@ func initials(name string) string {
 		return "?"
 	}
 	return string(b)
+}
+
+// handCursor shows the pointer (hand) cursor over a sz area at the origin:
+// rows and items whose clicks are handled by a parent area.
+func handCursor(gtx C, sz image.Point) {
+	defer clip.Rect{Max: sz}.Push(gtx.Ops).Pop()
+	pointer.CursorPointer.Add(gtx.Ops)
 }

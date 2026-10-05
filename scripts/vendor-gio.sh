@@ -10,6 +10,8 @@
 # Patches (macOS):
 #  - keep the native traffic lights visible on undecorated windows
 #  - double-click on a move area zooms the window
+# Patches (all platforms):
+#  - widget.Clickable shows the hand (pointer) cursor
 # Patches (windows):
 #  - Direct3D 11: fall back to the WARP software rasterizer without a GPU
 set -euo pipefail

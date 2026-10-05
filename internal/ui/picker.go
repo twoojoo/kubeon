@@ -170,6 +170,7 @@ func (p *Picker) Layout(gtx C) D {
 						gtx.Constraints.Min.Y = gtx.Constraints.Max.Y
 						area := clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops)
 						event.Op(gtx.Ops, &p.tag)
+						pointer.CursorPointer.Add(gtx.Ops)
 						for {
 							ev, ok := gtx.Event(pointer.Filter{Target: &p.tag, Kinds: pointer.Press})
 							if !ok {

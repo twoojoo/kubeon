@@ -748,6 +748,7 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 	th := v.app.th
 	r := s.Rows[i]
 	sz := image.Pt(gtx.Constraints.Max.X, rh)
+	handCursor(gtx, sz)
 	sel := i == v.sel
 	marked := v.marked[r.ID]
 	switch {

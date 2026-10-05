@@ -371,7 +371,11 @@ func (o *OverviewView) warning(gtx C, i int, w *backend.EventInfo) D {
 		if linkable && cl.Hovered() {
 			bgc = pal.Hover
 		}
-		return cl.Layout(gtx, func(gtx C) D {
+		cg := gtx
+		if !linkable { // hover only: no hand cursor for a row that does nothing
+			cg = gtx.Disabled()
+		}
+		return cl.Layout(cg, func(gtx C) D {
 			return rbg(gtx, bgc, 8, func(gtx C) D {
 				gtx.Constraints.Min.X = gtx.Constraints.Max.X
 				return insetHV(14, 10).Layout(gtx, func(gtx C) D {

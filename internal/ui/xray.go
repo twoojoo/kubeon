@@ -392,6 +392,7 @@ func (x *XRayView) layoutTreeRow(gtx C, i, rh int) D {
 	th := x.app.th
 	r := x.rows[i]
 	sz := image.Pt(gtx.Constraints.Max.X, rh)
+	handCursor(gtx, sz)
 	if i == x.sel {
 		fillRect(gtx, pal.Selected, image.Rectangle{Max: sz})
 		fillRect(gtx, pal.Accent, image.Rect(0, 0, gtx.Dp(3), rh))

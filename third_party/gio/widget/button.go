@@ -9,6 +9,7 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -91,6 +92,10 @@ func (b *Clickable) layout(t event.Tag, gtx layout.Context, w layout.Widget) lay
 	c := m.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
+	// kubeon: clickable things show the hand cursor (content may override)
+	if gtx.Enabled() {
+		pointer.CursorPointer.Add(gtx.Ops)
+	}
 	b.click.Add(gtx.Ops)
 	event.Op(gtx.Ops, t)
 	c.Add(gtx.Ops)
