@@ -206,11 +206,10 @@ func (o *OverviewView) cards(gtx C, d *backend.Overview) D {
 
 func (o *OverviewView) capacity(gtx C, d *backend.Overview) D {
 	th := o.app.th
-	cpu := func(m int64) string { return fmt.Sprintf("%.2f", float64(m)/1000) }
-	mem := func(b int64) string { return fmt.Sprintf("%.1fGi", float64(b)/(1<<30)) }
+	cpu, mem := backend.HumanMilli, backend.HumanBytes
 	return layout.Flex{}.Layout(gtx,
 		layout.Flexed(1, func(gtx C) D {
-			return meter(gtx, th, icCPU, "CPU (cores)", d.CPURequests, d.CPUUsage, d.CPUCapacity, cpu)
+			return meter(gtx, th, icCPU, "CPU", d.CPURequests, d.CPUUsage, d.CPUCapacity, cpu)
 		}),
 		layout.Rigid(layout.Spacer{Width: 12}.Layout),
 		layout.Flexed(1, func(gtx C) D {

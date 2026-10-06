@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -360,8 +361,43 @@ func (t *TableWatch) build() *Snapshot {
 		s.Rows = append(s.Rows, r)
 		return true
 	})
+	dropEmptyGPUCols(&s)
 
 	return &s
+}
+
+// dropEmptyGPUCols hides the GPU columns when no row has a GPU value:
+// on clusters without GPUs they are only noise eating table width.
+func dropEmptyGPUCols(s *Snapshot) {
+	keep := make([]int, 0, len(s.Columns))
+	for i, c := range s.Columns {
+		if !strings.Contains(c.Name, "GPU") || slices.ContainsFunc(s.Rows, func(r Row) bool { return !emptyGPU(r.Cells[i]) }) {
+			keep = append(keep, i)
+		}
+	}
+	if len(keep) == len(s.Columns) {
+		return
+	}
+	cols := make([]Column, len(keep))
+	for j, i := range keep {
+		cols[j] = s.Columns[i]
+	}
+	s.Columns = cols
+	for ri := range s.Rows {
+		cells := make([]string, len(keep))
+		for j, i := range keep {
+			cells[j] = s.Rows[ri].Cells[i]
+		}
+		s.Rows[ri].Cells = cells
+	}
+}
+
+func emptyGPU(v string) bool {
+	switch v {
+	case "", "0", "0:0", "n/a":
+		return true
+	}
+	return false
 }
 
 func (t *TableWatch) excludeCol(h model1.HeaderColumn, wide bool) bool {

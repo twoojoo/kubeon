@@ -42,6 +42,7 @@ type ResourceView struct {
 	sel     int
 	selID   string
 	widths  []int
+	kinds   []cellKind // per column, with widths
 	widthOf struct {
 		seq   uint64
 		avail int
@@ -509,6 +510,10 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 		return
 	}
 	v.widthOf.seq, v.widthOf.avail = s.Seq, avail
+	v.kinds = make([]cellKind, len(s.Columns))
+	for i, c := range s.Columns {
+		v.kinds[i] = colKind(c.Name)
+	}
 	charW := float32(gtx.Sp(tableText)) * 0.64
 	pad := gtx.Dp(cellPad)*2 + gtx.Dp(4)
 	maxLen := make([]int, len(s.Columns))
@@ -522,6 +527,9 @@ func (v *ResourceView) computeWidths(gtx C, s *backend.Snapshot) {
 	for r := 0; r < len(s.Rows); r += step {
 		for i, cell := range s.Rows[r].Cells {
 			if i < len(maxLen) {
+				if i > 0 {
+					cell, _ = fmtCell(v.kinds[i], cell)
+				}
 				if n := utf8.RuneCountInString(cell); n > maxLen[i] {
 					maxLen[i] = n
 				}
@@ -773,18 +781,27 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 	}
 	x := 0
 	pad := gtx.Dp(cellPad)
-	for c, cell := range r.Cells {
-		if c >= len(v.widths) {
+	for c, raw := range r.Cells {
+		if c >= len(v.widths) || c >= len(v.kinds) {
 			break
 		}
 		w := v.widths[c]
-		if cell != "" {
+		if raw != "" {
+			cell, dim := raw, false
+			if c > 0 {
+				cell, dim = fmtCell(v.kinds[c], raw)
+			}
 			st := op.Offset(image.Pt(x+pad, 0)).Push(gtx.Ops)
 			cg := gtx
 			cg.Constraints = layout.Exact(image.Pt(max(0, w-2*pad), rh))
 			col := fg
-			if c == 0 && !sel && r.State == backend.StateStd {
+			switch {
+			case c == 0 && !sel && r.State == backend.StateStd:
 				col = pal.TextBright
+			case dim && !sel:
+				col = pal.TextDim
+			case v.kinds[c] == kindRestarts && !sel && r.State == backend.StateStd:
+				col = pal.Warn
 			}
 			text := func(gtx C) D { return lbl(gtx, th, fontSans, tableText, col, cell) }
 			name := s.Columns[c].Name
@@ -797,6 +814,9 @@ func (v *ResourceView) layoutRow(gtx C, s *backend.Snapshot, i, rh int) D {
 			switch {
 			case isStatusCol(name) && toned:
 				layout.W.Layout(cg, func(gtx C) D { return pill(gtx, th, cell, tone) })
+			case v.kinds[c] == kindPct && !dim:
+				pctBar(cg, raw)
+				layout.E.Layout(cg, text)
 			case name == "READY" && !sel && notReady(cell) && r.State != backend.StateCompleted:
 				col = pal.Warn
 				layout.W.Layout(cg, text)

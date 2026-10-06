@@ -228,7 +228,12 @@ func (c *Cluster) Details(gvr, path string) (*Details, error) {
 	case "v1/persistentvolumeclaims":
 		var pvc v1.PersistentVolumeClaim
 		if toTyped(u, &pvc) == nil {
-			cap := pvc.Status.Capacity[v1.ResourceStorage]
+			capStr := "—"
+			if q, ok := pvc.Status.Capacity[v1.ResourceStorage]; ok && !q.IsZero() {
+				capStr = HumanQuantity(v1.ResourceStorage, q)
+			} else if q, ok := pvc.Spec.Resources.Requests[v1.ResourceStorage]; ok {
+				capStr = HumanQuantity(v1.ResourceStorage, q) + " (requested)"
+			}
 			sc := ""
 			if pvc.Spec.StorageClassName != nil {
 				sc = *pvc.Spec.StorageClassName
@@ -239,7 +244,7 @@ func (c *Cluster) Details(gvr, path string) (*Details, error) {
 			}
 			d.Sections = append(d.Sections, Section{Title: "Claim", Fields: []Field{
 				{Key: "Status", Value: string(pvc.Status.Phase), Tone: tone},
-				{Key: "Capacity", Value: cap.String()},
+				{Key: "Capacity", Value: capStr},
 				{Key: "Storage class", Value: sc, Link: linkIf("storage.k8s.io/v1/storageclasses", "", sc)},
 				{Key: "Volume", Value: pvc.Spec.VolumeName, Link: linkIf("v1/persistentvolumes", "", pvc.Spec.VolumeName)},
 				{Key: "Access modes", Value: accessModes(pvc.Spec.AccessModes)},
@@ -404,10 +409,10 @@ func resourcesString(r v1.ResourceRequirements) (req, lim string) {
 	f := func(l v1.ResourceList) string {
 		var parts []string
 		if q, ok := l[v1.ResourceCPU]; ok {
-			parts = append(parts, "cpu "+q.String())
+			parts = append(parts, "cpu "+HumanQuantity(v1.ResourceCPU, q))
 		}
 		if q, ok := l[v1.ResourceMemory]; ok {
-			parts = append(parts, "mem "+q.String())
+			parts = append(parts, "mem "+HumanQuantity(v1.ResourceMemory, q))
 		}
 		if len(parts) == 0 {
 			return "none"
@@ -756,7 +761,7 @@ func (c *Cluster) nodeSections(n *v1.Node) []Section {
 	res := &DTable{Columns: []string{"RESOURCE", "CAPACITY", "ALLOCATABLE"}}
 	for _, r := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods, v1.ResourceEphemeralStorage} {
 		cq, aq := n.Status.Capacity[r], n.Status.Allocatable[r]
-		res.Rows = append(res.Rows, []Field{{Value: string(r)}, {Value: cq.String(), Mono: true}, {Value: aq.String(), Mono: true}})
+		res.Rows = append(res.Rows, []Field{{Value: string(r)}, {Value: HumanQuantity(r, cq), Mono: true}, {Value: HumanQuantity(r, aq), Mono: true}})
 	}
 	out := []Section{{Title: "Node", Fields: f}, {Title: "Resources", Table: res}}
 	if len(n.Spec.Taints) > 0 {
