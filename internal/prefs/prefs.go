@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -21,7 +22,8 @@ type ContextPolicy struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// PortForward is a saved tunnel re-opened when the context connects.
+// PortForward is a saved tunnel. Pinned ones (AutoStart) are re-opened when
+// the context connects; a named tunnel that isn't pinned is only remembered.
 type PortForward struct {
 	Context   string `json:"context"`
 	GVR       string `json:"gvr"`
@@ -29,6 +31,20 @@ type PortForward struct {
 	Local     int    `json:"local"`
 	Remote    int    `json:"remote"`
 	AutoStart bool   `json:"autoStart"`
+	Name      string `json:"name,omitempty"` // user label
+}
+
+// MaxForwardName is the longest tunnel name kept.
+const MaxForwardName = 60
+
+// CleanForwardName trims a user-typed tunnel name: surrounding space gone,
+// inner whitespace (newlines, tabs) collapsed, at most MaxForwardName runes.
+func CleanForwardName(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > MaxForwardName {
+		s = strings.TrimSpace(string(r[:MaxForwardName]))
+	}
+	return s
 }
 
 // Bookmark is a saved view.
@@ -139,6 +155,72 @@ func (p *Prefs) SavePortForward(f PortForward) {
 		}
 	}
 	p.PortForwards = append(p.PortForwards, f)
+}
+
+// FindPortForward returns the saved entry for f (identified by context,
+// resource and remote port), if any.
+func (p *Prefs) FindPortForward(f PortForward) (PortForward, bool) {
+	for _, x := range p.PortForwards {
+		if samePF(x, f) {
+			return x, true
+		}
+	}
+	return PortForward{}, false
+}
+
+// SetPortForwardName names the tunnel f. An unsaved tunnel gets remembered
+// (not pinned); clearing the name of one that isn't pinned forgets it.
+func (p *Prefs) SetPortForwardName(f PortForward, name string) {
+	name = CleanForwardName(name)
+	cur, ok := p.FindPortForward(f)
+	switch {
+	case ok:
+		cur.Name = name
+		if name == "" && !cur.AutoStart {
+			p.RemovePortForward(cur)
+			return
+		}
+		p.SavePortForward(cur)
+	case name != "":
+		f.Name, f.AutoStart = name, false
+		p.SavePortForward(f)
+	}
+}
+
+// TogglePinPortForward pins f (re-opened on connect) or unpins it. Unpinning
+// keeps a named tunnel and forgets an unnamed one. Returns the new state.
+func (p *Prefs) TogglePinPortForward(f PortForward) bool {
+	cur, ok := p.FindPortForward(f)
+	switch {
+	case !ok:
+		f.AutoStart = true
+		p.SavePortForward(f)
+		return true
+	case cur.AutoStart && cur.Name == "":
+		p.RemovePortForward(cur)
+		return false
+	default:
+		cur.AutoStart = !cur.AutoStart
+		p.SavePortForward(cur)
+		return cur.AutoStart
+	}
+}
+
+// ForwardLabel is the user's name of tunnel f, or "".
+func (p *Prefs) ForwardLabel(f PortForward) string {
+	cur, _ := p.FindPortForward(f)
+	return cur.Name
+}
+
+// PinnedForwards counts the tunnels of ctx re-opened on connect.
+func (p *Prefs) PinnedForwards(ctx string) int {
+	n := 0
+	for _, f := range p.SavedForwards(ctx) {
+		if f.AutoStart {
+			n++
+		}
+	}
+	return n
 }
 
 // RemovePortForward deletes a saved forward.

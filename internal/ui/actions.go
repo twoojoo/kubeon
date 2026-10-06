@@ -425,7 +425,7 @@ func (v *ResourceView) portForward() {
 								a.flash("port-forward failed: "+err.Error(), true)
 								return
 							}
-							a.flash("Forwarding "+pf.String(), false)
+							a.flash("Forwarding "+a.forwardTitle(forwardRef(c.Context, gvr, path, pf.Local, rr), pf.String()), false)
 						})
 					}()
 				})
@@ -449,8 +449,9 @@ func (a *App) pickForward() {
 	var items []string
 	ids := map[string]string{}
 	for _, p := range pfs {
-		items = append(items, p.String())
-		ids[p.String()] = p.ID
+		item := a.forwardTitle(forwardRef(a.cluster.Context, p.GVR, p.Target, p.Local, p.Remote), p.String())
+		items = append(items, item)
+		ids[item] = p.ID
 	}
 	c := a.cluster
 	a.overlay = newPicker(a, "Active port-forwards — select to stop", items, false, func(s string) {

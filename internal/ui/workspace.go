@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"gioui.org/io/key"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
@@ -20,8 +22,21 @@ import (
 // openBrowser opens url with the desktop handler.
 func openBrowser(url string) error { return desktop.Open(url) }
 
-// startSavedForwards re-opens the auto-start forwards of the context. They
-// start without confirmation (the user pinned them) but are announced in one
+// forwardRef identifies a tunnel in the saved preferences.
+func forwardRef(ctx, gvr, path string, local, remote int) prefs.PortForward {
+	return prefs.PortForward{Context: ctx, GVR: gvr, Path: path, Local: local, Remote: remote}
+}
+
+// forwardTitle is how a tunnel is called in messages: its name, else addr.
+func (a *App) forwardTitle(f prefs.PortForward, addr string) string {
+	if n := a.prefs.ForwardLabel(f); n != "" {
+		return n + " (" + addr + ")"
+	}
+	return addr
+}
+
+// startSavedForwards re-opens the pinned forwards of the context. They start
+// without confirmation (the user pinned them) but are announced in one
 // summary; on protected contexts also in the notification bell.
 func (a *App) startSavedForwards(c *backend.Cluster) {
 	var todo []prefs.PortForward
@@ -37,9 +52,9 @@ func (a *App) startSavedForwards(c *backend.Cluster) {
 		var opened, failed []string
 		for _, f := range todo {
 			if pf, err := c.PortForward(f.GVR, f.Path, f.Local, f.Remote); err != nil {
-				failed = append(failed, fmt.Sprintf("%s:%d (%v)", f.Path, f.Remote, err))
+				failed = append(failed, fmt.Sprintf("%s (%v)", a.forwardTitle(f, fmt.Sprintf("%s:%d", f.Path, f.Remote)), err))
 			} else {
-				opened = append(opened, pf.String())
+				opened = append(opened, a.forwardTitle(f, pf.String()))
 			}
 		}
 		a.post(func() {
@@ -80,6 +95,21 @@ type pfRow struct {
 	active                    *backend.PortForward
 	saved                     *prefs.PortForward
 	open, pin, toggle, remove widget.Clickable
+	name                      widget.Editor // the tunnel's label, saved as you type
+}
+
+func newPFRow() *pfRow {
+	r := &pfRow{}
+	r.name.SingleLine, r.name.Submit, r.name.MaxLen = true, true, prefs.MaxForwardName
+	return r
+}
+
+// savedName is the name stored for the row ("" = none).
+func (r *pfRow) savedName() string {
+	if r.saved == nil {
+		return ""
+	}
+	return r.saved.Name
 }
 
 func (r *pfRow) key() (gvr, path string, local, remote int) {
@@ -122,7 +152,7 @@ func (p *PortForwardPanel) reload() {
 		k := fmt.Sprintf("%s|%s|%d", f.GVR, f.Target, f.Remote)
 		r := old[k]
 		if r == nil {
-			r = &pfRow{}
+			r = newPFRow()
 		}
 		r.active, r.saved = f, nil
 		rows = append(rows, r)
@@ -137,7 +167,7 @@ func (p *PortForwardPanel) reload() {
 		}
 		r := old[k]
 		if r == nil {
-			r = &pfRow{}
+			r = newPFRow()
 		}
 		r.active, r.saved = nil, &s
 		rows = append(rows, r)
@@ -156,13 +186,25 @@ func (p *PortForwardPanel) Layout(gtx C) D {
 				a.flash("open browser: "+err.Error(), true)
 			}
 		}
-		if r.pin.Clicked(gtx) {
-			if r.saved != nil {
-				a.prefs.RemovePortForward(*r.saved)
-			} else {
-				a.prefs.SavePortForward(prefs.PortForward{Context: c.Context, GVR: gvr, Path: path, Local: local, Remote: remote, AutoStart: true})
+		// the name is saved as it is typed (also when the panel is dismissed)
+		for {
+			ev, ok := r.name.Update(gtx)
+			if !ok {
+				break
 			}
-			_ = a.prefs.Save()
+			switch ev.(type) {
+			case widget.SubmitEvent:
+				gtx.Execute(key.FocusCmd{})
+			case widget.ChangeEvent:
+				p.rename(r, r.name.Text())
+			}
+		}
+		if !gtx.Focused(&r.name) && r.name.Text() != r.savedName() {
+			r.name.SetText(r.savedName()) // follow the saved value (after a reload, or a trim)
+		}
+		if r.pin.Clicked(gtx) {
+			a.prefs.TogglePinPortForward(forwardRef(c.Context, gvr, path, local, remote))
+			p.save()
 			p.reload()
 		}
 		if r.toggle.Clicked(gtx) {
@@ -190,7 +232,7 @@ func (p *PortForwardPanel) Layout(gtx C) D {
 			}
 			if r.saved != nil {
 				a.prefs.RemovePortForward(*r.saved)
-				_ = a.prefs.Save()
+				p.save()
 			}
 			p.reload()
 		}
@@ -203,7 +245,7 @@ func (p *PortForwardPanel) Layout(gtx C) D {
 				layout.Rigid(func(gtx C) D { return iconText(gtx, th, icForward, 16, pal.TextBright, "Port-forwards") }),
 				layout.Rigid(func(gtx C) D {
 					return layout.Inset{Top: 4, Bottom: 10}.Layout(gtx, func(gtx C) D {
-						return lbl(gtx, th, fontSans, 11, pal.TextDim, "Pinned forwards are saved and re-opened automatically when this context connects.")
+						return lbl(gtx, th, fontSans, 11, pal.TextDim, "Pin a tunnel to re-open it when this context connects. Give it a name to recognise it.")
 					})
 				}),
 				layout.Rigid(func(gtx C) D {
@@ -219,6 +261,49 @@ func (p *PortForwardPanel) Layout(gtx C) D {
 				}),
 			)
 		})
+	})
+}
+
+func (p *PortForwardPanel) save() {
+	if err := p.app.prefs.Save(); err != nil {
+		p.app.flash("save preferences: "+err.Error(), true)
+	}
+}
+
+// rename stores the name typed for row r (a tunnel never named before is
+// remembered, unpinned; an emptied name of an unpinned tunnel is forgotten).
+func (p *PortForwardPanel) rename(r *pfRow, name string) {
+	a := p.app
+	if a.cluster == nil || prefs.CleanForwardName(name) == r.savedName() {
+		return
+	}
+	gvr, path, local, remote := r.key()
+	a.prefs.SetPortForwardName(forwardRef(a.cluster.Context, gvr, path, local, remote), name)
+	p.save()
+	p.reload()
+}
+
+// nameField is the tunnel's name: an inline text field (hint when empty)
+// underlined while hovered or focused.
+func (p *PortForwardPanel) nameField(gtx C, r *pfRow) D {
+	th := p.app.th
+	return layout.Inset{Bottom: 3}.Layout(gtx, func(gtx C) D {
+		m := op.Record(gtx.Ops)
+		ed := material.Editor(th, &r.name, "Add a name…")
+		ed.Font, ed.TextSize = fontSans, 13.5
+		ed.Color, ed.HintColor, ed.SelectionColor = pal.TextBright, pal.TextDim, withAlpha(pal.Accent, 0x60)
+		d := ed.Layout(gtx)
+		call := m.Stop()
+		call.Add(gtx.Ops)
+		line := withAlpha(pal.Border, 0x00)
+		switch {
+		case gtx.Focused(&r.name):
+			line = pal.Accent
+		case r.savedName() == "":
+			line = withAlpha(pal.Border, 0xa0) // invites typing
+		}
+		fillRect(gtx, line, image.Rect(0, d.Size.Y, d.Size.X, d.Size.Y+gtx.Dp(1)))
+		return D{Size: image.Pt(d.Size.X, d.Size.Y+gtx.Dp(1))}
 	})
 }
 
@@ -238,8 +323,9 @@ func (p *PortForwardPanel) layoutRow(gtx C, r *pfRow) D {
 					layout.Rigid(layout.Spacer{Width: 9}.Layout),
 					layout.Flexed(1, func(gtx C) D {
 						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return p.nameField(gtx, r) }),
 							layout.Rigid(func(gtx C) D {
-								return p.app.selLbl(gtx, fmt.Sprintf("pf/%s/%s/%d", gvr, path, remote), fontMono, 12.5, pal.TextBright, fmt.Sprintf("localhost:%d → :%d", local, remote))
+								return p.app.selLbl(gtx, fmt.Sprintf("pf/%s/%s/%d", gvr, path, remote), fontMono, 12, pal.Text, fmt.Sprintf("localhost:%d → :%d", local, remote))
 							}),
 							layout.Rigid(func(gtx C) D {
 								return p.app.selLbl(gtx, fmt.Sprintf("pf/%s/%s/%d/sub", gvr, path, remote), fontSans, 11, pal.TextDim, singular(strings.ToLower(titleFor(gvr)))+" "+path+" · "+st)
@@ -254,7 +340,7 @@ func (p *PortForwardPanel) layoutRow(gtx C, r *pfRow) D {
 					}),
 					layout.Rigid(func(gtx C) D {
 						ic, txt, c := icBookmark, "Pin", pal.TextDim
-						if r.saved != nil {
+						if r.saved != nil && r.saved.AutoStart {
 							txt, c = "Pinned", pal.Accent
 						}
 						return pillButton(gtx, th, &r.pin, ic, txt, c, colorNRGBA{})

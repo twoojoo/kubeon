@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -85,5 +86,65 @@ func TestBrokenSettingsQuarantined(t *testing.T) {
 	}
 	if st, _ := os.Stat(path); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 { // no unix modes on Windows
 		t.Fatalf("mode %v", st.Mode())
+	}
+}
+
+func TestPortForwardNamesAndPins(t *testing.T) {
+	p := &Prefs{Contexts: map[string]ContextPolicy{}}
+	f := PortForward{Context: "c", GVR: "apps/v1/deployments", Path: "demo/web", Local: 8080, Remote: 80}
+
+	// naming an unsaved tunnel remembers it, without pinning
+	p.SetPortForwardName(f, "  Web \n demo  ")
+	got, ok := p.FindPortForward(f)
+	if !ok || got.Name != "Web demo" || got.AutoStart {
+		t.Fatalf("named: %+v ok=%v", got, ok)
+	}
+	if p.PinnedForwards("c") != 0 || len(p.SavedForwards("c")) != 1 {
+		t.Fatal("a named tunnel must not count as pinned")
+	}
+	// clearing the name of an unpinned tunnel forgets it
+	p.SetPortForwardName(f, "")
+	if _, ok := p.FindPortForward(f); ok {
+		t.Fatal("unnamed + unpinned entry should be removed")
+	}
+
+	// pin, name, unpin: the named tunnel stays (unpinned)
+	if !p.TogglePinPortForward(f) || p.PinnedForwards("c") != 1 {
+		t.Fatal("pin failed")
+	}
+	p.SetPortForwardName(f, "Web")
+	if p.TogglePinPortForward(f) {
+		t.Fatal("second toggle should unpin")
+	}
+	got, ok = p.FindPortForward(f)
+	if !ok || got.AutoStart || got.Name != "Web" {
+		t.Fatalf("unpinned named: %+v ok=%v", got, ok)
+	}
+	// pin again keeps the name; unpin an unnamed pinned one removes it
+	if !p.TogglePinPortForward(f) || p.ForwardLabel(f) != "Web" {
+		t.Fatal("re-pin lost the name")
+	}
+	p.SetPortForwardName(f, "")
+	p.TogglePinPortForward(f)
+	if _, ok := p.FindPortForward(f); ok {
+		t.Fatal("unnamed pinned entry should disappear when unpinned")
+	}
+
+	// the local port doesn't change a tunnel's identity
+	p.SetPortForwardName(f, "A")
+	f.Local = 9090
+	p.SetPortForwardName(f, "B")
+	if len(p.PortForwards) != 1 || p.PortForwards[0].Name != "B" {
+		t.Fatalf("entries %+v", p.PortForwards)
+	}
+}
+
+func TestCleanForwardName(t *testing.T) {
+	long := strings.Repeat("é", MaxForwardName+10)
+	if got := CleanForwardName(long); len([]rune(got)) != MaxForwardName {
+		t.Fatalf("len %d", len([]rune(got)))
+	}
+	if CleanForwardName(" \t\n ") != "" || CleanForwardName("a   b") != "a b" {
+		t.Fatal("whitespace handling")
 	}
 }

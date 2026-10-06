@@ -165,7 +165,7 @@ func (p *PrefsPanel) Layout(gtx C) D {
 					}),
 					section("PORT-FORWARDS"),
 					layout.Rigid(func(gtx C) D {
-						n := len(a.prefs.SavedForwards(ctx))
+						n := a.prefs.PinnedForwards(ctx)
 						return pillButton(gtx, th, &p.pfBtn, icForward, "Manage port-forwards ("+itoa(n)+" pinned)", pal.Text, pal.Hover)
 					}),
 					section("BOOKMARKS"),

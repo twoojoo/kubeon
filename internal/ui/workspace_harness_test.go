@@ -272,3 +272,65 @@ func TestUIProtectedTunnels(t *testing.T) {
 		t.Fatal("read-only, unprotected context must open tunnels directly")
 	}
 }
+
+// Tunnels can be named: typed in the panel, saved as you type, shown in
+// messages and restored on the next start.
+func TestUIPortForwardNames(t *testing.T) {
+	isolatedPrefs(t)
+	h := newHarness(t, Options{Namespace: "demo", Resource: "deploy"})
+	a := h.a
+	selectRow(t, h, "demo/web")
+	const ctx = "kind-kubeon-dev"
+	ref := forwardRef(ctx, "apps/v1/deployments", "demo/web", 0, 8080)
+
+	pf, err := a.cluster.PortForward("apps/v1/deployments", "demo/web", 0, 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	panel := newPortForwardPanel(a)
+	a.overlay = panel
+	h.settle(80 * time.Millisecond)
+	row := panel.rows[0]
+
+	// focus the name field and type
+	g := h.gtxForTest()
+	g.Execute(key.FocusCmd{Tag: &row.name})
+	h.frame()
+	h.typeText("  Web   demo ")
+	h.settle(80 * time.Millisecond)
+	saved, ok := prefs.Load().FindPortForward(ref)
+	if !ok || saved.Name != "Web demo" || saved.AutoStart || saved.Local != pf.Local {
+		t.Fatalf("saved after typing: %+v ok=%v (want name 'Web demo', unpinned, local %d)", saved, ok, pf.Local)
+	}
+	if got := a.forwardTitle(ref, "ADDR"); got != "Web demo (ADDR)" {
+		t.Fatalf("title %q", got)
+	}
+	h.shot("65-pf-name")
+
+	// pin keeps the name; the pinned count follows
+	row.pin.Click()
+	h.settle(80 * time.Millisecond)
+	if p := prefs.Load(); p.PinnedForwards(ctx) != 1 || p.ForwardLabel(ref) != "Web demo" {
+		t.Fatalf("after pin: %+v", p.PortForwards)
+	}
+	// unpin: named, so it stays (unpinned); then it is not restored
+	row.pin.Click()
+	h.settle(80 * time.Millisecond)
+	if p := prefs.Load(); p.PinnedForwards(ctx) != 0 || p.ForwardLabel(ref) != "Web demo" {
+		t.Fatalf("after unpin: %+v", p.PortForwards)
+	}
+	row.pin.Click() // pinned again for the restore check
+	h.settle(80 * time.Millisecond)
+	a.cluster.StopPortForward(pf.ID)
+	a.overlay = nil
+
+	// a new instance restores it and announces it by name
+	h2 := newHarness(t, Options{Namespace: "demo", Resource: "deploy"})
+	h2.waitFor("forward restored", func() bool {
+		return h2.a.cluster != nil && len(h2.a.cluster.PortForwards()) == 1
+	})
+	h2.waitFor("restore message", func() bool { return strings.Contains(h2.a.status, "Web demo (") })
+	for _, f := range h2.a.cluster.PortForwards() {
+		h2.a.cluster.StopPortForward(f.ID)
+	}
+}
