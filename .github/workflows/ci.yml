@@ -50,6 +50,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: ui-screenshots
           path: .dev/shots/
           if-no-files-found: ignore
@@ -84,6 +85,7 @@ jobs:
           [ "$code" = 124 ] || { echo "kubeon exited early with $code"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: kubeon-linux-${{ matrix.arch }}
           path: |
             dist/*.AppImage
@@ -120,6 +122,7 @@ jobs:
           Stop-Process -Id $p.Id
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: kubeon-windows
           path: dist/*.zip
 
@@ -173,6 +176,7 @@ jobs:
           kill $pid
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: kubeon-macos
           path: |
             dist/*.dmg
