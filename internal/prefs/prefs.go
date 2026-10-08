@@ -65,6 +65,8 @@ type Prefs struct {
 	PortForwards []PortForward            `json:"portForwards,omitempty"`
 	Bookmarks    []Bookmark               `json:"bookmarks,omitempty"`
 	CheckUpdates *bool                    `json:"checkUpdates,omitempty"` // nil = on
+	// UIScale enlarges or shrinks the whole interface (1 = 100%).
+	UIScale float64 `json:"uiScale,omitempty"`
 
 	// LoadError reports a settings file that could not be parsed.
 	LoadError error `json:"-"`

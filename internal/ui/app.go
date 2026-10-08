@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"log/slog"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -361,6 +362,10 @@ func (a *App) textFocused(gtx C) bool {
 }
 
 func (a *App) layout(gtx C) {
+	if s := float32(a.uiScale()); s != 1 {
+		gtx.Metric.PxPerDp *= s
+		gtx.Metric.PxPerSp *= s
+	}
 	a.frame++
 	a.selWasFocused, a.selFocused = a.selFocused, false
 	a.lineSelPrev, a.lineSel = a.lineSel, nil
@@ -741,6 +746,51 @@ func (a *App) pageTitleSafe() string {
 		return ""
 	}
 	return a.view.title
+}
+
+// UI scale steps (Ctrl+= / Ctrl+- / Ctrl+0, Preferences → Interface size).
+var uiScales = []float64{0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.8}
+
+func (a *App) uiScale() float64 {
+	s := a.prefs.UIScale
+	if !(s > 0) || math.IsInf(s, 0) { // unset or a corrupt settings file
+		return 1
+	}
+	return max(uiScales[0], min(uiScales[len(uiScales)-1], s))
+}
+
+// setUIScale applies and saves an interface size.
+func (a *App) setUIScale(s float64) {
+	s = max(uiScales[0], min(uiScales[len(uiScales)-1], s))
+	a.prefs.UIScale = s
+	a.flash(fmt.Sprintf("Interface size %d%%", int(s*100+0.5)), false)
+	if err := a.prefs.Save(); err != nil {
+		a.flash("save preferences: "+err.Error(), true)
+	}
+}
+
+// zoom moves the interface size one step (dir = +1 / -1, 0 = reset).
+func (a *App) zoom(dir int) {
+	if dir == 0 {
+		a.setUIScale(1)
+		return
+	}
+	cur := a.uiScale()
+	if dir > 0 {
+		for _, s := range uiScales {
+			if s > cur+0.001 {
+				a.setUIScale(s)
+				return
+			}
+		}
+		return
+	}
+	for i := len(uiScales) - 1; i >= 0; i-- {
+		if uiScales[i] < cur-0.001 {
+			a.setUIScale(uiScales[i])
+			return
+		}
+	}
 }
 
 // toggleTheme switches dark/light and persists the choice.

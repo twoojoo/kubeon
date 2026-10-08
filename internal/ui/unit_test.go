@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"math"
 	"testing"
 
 	"gioui.org/io/key"
 	"github.com/hinshun/vt10x"
+
+	"github.com/giovanni/kubeon/internal/prefs"
 )
 
 func TestKeySeq(t *testing.T) {
@@ -45,5 +48,32 @@ func TestPickerFilterPrefersPrefix(t *testing.T) {
 	p.refilter()
 	if len(p.matches) == 0 || p.items[p.matches[0]] != "Deployments" {
 		t.Fatalf("got %v", p.matches)
+	}
+}
+
+func TestUIScaleClamp(t *testing.T) {
+	t.Setenv("KUBEON_CONFIG_DIR", t.TempDir())
+	a := &App{prefs: prefs.Load()}
+	for in, want := range map[float64]float64{0: 1, -2: 1, math.NaN(): 1, math.Inf(1): 1, 100: 1.8, 0.01: 0.8, 1.25: 1.25} {
+		a.prefs.UIScale = in
+		if got := a.uiScale(); got != want {
+			t.Errorf("uiScale(%v) = %v, want %v", in, got, want)
+		}
+	}
+	a.prefs.UIScale = 1.8
+	a.zoom(1)
+	if a.uiScale() != 1.8 {
+		t.Error("zoom past the largest step")
+	}
+	a.zoom(-1)
+	if a.uiScale() != 1.6 {
+		t.Errorf("zoom out %v", a.uiScale())
+	}
+	a.zoom(0)
+	if a.uiScale() != 1 {
+		t.Error("zoom reset")
+	}
+	if got := prefs.Load().UIScale; got != 1 {
+		t.Errorf("saved scale %v", got)
 	}
 }

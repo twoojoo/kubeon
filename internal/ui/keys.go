@@ -16,6 +16,10 @@ func (a *App) handleKeys(gtx C) {
 		key.Filter{Name: "W", Required: key.ModShortcut},
 		key.Filter{Name: key.NameTab, Required: key.ModShortcut, Optional: key.ModShift},
 		key.Filter{Name: ",", Required: key.ModShortcut},
+		key.Filter{Name: "=", Required: key.ModShortcut, Optional: key.ModShift},
+		key.Filter{Name: "+", Required: key.ModShortcut, Optional: key.ModShift},
+		key.Filter{Name: "-", Required: key.ModShortcut},
+		key.Filter{Name: "0", Required: key.ModShortcut},
 	}
 	nav := a.cluster != nil && !a.textFocused(gtx)
 	if nav {
@@ -61,9 +65,16 @@ func (a *App) handleKeys(gtx C) {
 func (a *App) onKey(gtx C, e key.Event, nav bool) {
 	v := a.view
 	ctrl := e.Modifiers.Contain(key.ModCtrl)
+	sc := e.Modifiers.Contain(key.ModShortcut)
 	switch {
 	case e.Name == key.NameEscape:
 		a.escape(gtx)
+	case sc && (e.Name == "=" || e.Name == "+"):
+		a.zoom(1)
+	case sc && e.Name == "-":
+		a.zoom(-1)
+	case sc && e.Name == "0":
+		a.zoom(0)
 	case a.overlay != nil:
 		// a dialog is open: nothing may change the state it acts on
 		// (switching or closing tabs under a confirmation or a diff review)

@@ -334,3 +334,33 @@ func TestUIPortForwardNames(t *testing.T) {
 		h2.a.cluster.StopPortForward(f.ID)
 	}
 }
+
+func TestUIZoom(t *testing.T) {
+	isolatedPrefs(t)
+	h := newHarness(t, Options{Namespace: "demo", Resource: "po"})
+	a := h.a
+	selectRow(t, h, "demo/web")
+
+	h.press("=", key.ModShortcut)
+	h.press("+", key.ModShortcut|key.ModShift)
+	h.settle(150 * time.Millisecond)
+	if a.uiScale() != 1.25 {
+		t.Fatalf("zoom in: scale %v", a.uiScale())
+	}
+	h.shot("58-zoom-125")
+	h.press("-", key.ModShortcut)
+	if a.uiScale() != 1.1 {
+		t.Fatalf("zoom out: scale %v", a.uiScale())
+	}
+	if prefs.Load().UIScale != 1.1 {
+		t.Fatal("scale not persisted")
+	}
+	h.press(",", key.ModShortcut)
+	h.settle(150 * time.Millisecond)
+	h.shot("59-zoom-prefs")
+	h.press("0", key.ModShortcut) // works with a dialog open too
+	if a.uiScale() != 1 {
+		t.Fatalf("zoom reset: scale %v", a.uiScale())
+	}
+	h.press(key.NameEscape)
+}

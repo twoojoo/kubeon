@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"gioui.org/layout"
 	"gioui.org/widget"
 
@@ -16,11 +18,12 @@ type PrefsPanel struct {
 	updAutoBtn, updNowBtn                              widget.Clickable
 	bmDel                                              map[string]*widget.Clickable
 	bmOpen                                             map[string]*widget.Clickable
+	scaleBtn                                           map[string]*widget.Clickable
 	list                                               widget.List
 }
 
 func newPrefsPanel(a *App) *PrefsPanel {
-	p := &PrefsPanel{app: a, bmDel: map[string]*widget.Clickable{}, bmOpen: map[string]*widget.Clickable{}}
+	p := &PrefsPanel{app: a, bmDel: map[string]*widget.Clickable{}, bmOpen: map[string]*widget.Clickable{}, scaleBtn: map[string]*widget.Clickable{}}
 	p.list.Axis = layout.Vertical
 	return p
 }
@@ -59,6 +62,11 @@ func (p *PrefsPanel) Layout(gtx C) D {
 	}
 	if p.lightBtn.Clicked(gtx) && a.prefs.Theme != "light" {
 		a.toggleTheme()
+	}
+	for _, s := range uiScales {
+		if clickOf(p.scaleBtn, fmt.Sprint(s)).Clicked(gtx) {
+			a.setUIScale(s)
+		}
 	}
 	ctx := ""
 	if a.cluster != nil {
@@ -134,6 +142,32 @@ func (p *PrefsPanel) Layout(gtx C) D {
 							)
 						})
 					})
+				}),
+				section("INTERFACE SIZE"),
+				layout.Rigid(func(gtx C) D {
+					cur := a.uiScale()
+					var ch []layout.FlexChild
+					for _, s := range uiScales {
+						ch = append(ch, layout.Rigid(func(gtx C) D {
+							b, c := colorNRGBA{}, pal.TextDim
+							if s == cur {
+								b, c = pal.Selected, pal.TextBright
+							}
+							return pillButton(gtx, th, clickOf(p.scaleBtn, fmt.Sprint(s)), nil, fmt.Sprintf("%d%%", int(s*100+0.5)), c, b)
+						}))
+					}
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+						layout.Rigid(func(gtx C) D {
+							return rborder(gtx, pal.Border, pal.Bg, 7, func(gtx C) D {
+								return inset(2).Layout(gtx, func(gtx C) D { return layout.Flex{}.Layout(gtx, ch...) })
+							})
+						}),
+						layout.Rigid(func(gtx C) D {
+							return layout.Inset{Top: 6}.Layout(gtx, func(gtx C) D {
+								return lbl(gtx, th, fontSans, 11, pal.TextDim, "Also with "+shortcutLabel("+")+", "+shortcutLabel("−")+" and "+shortcutLabel("0"))
+							})
+						}),
+					)
 				}),
 			}
 			if ctx != "" {
