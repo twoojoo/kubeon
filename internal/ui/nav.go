@@ -27,6 +27,11 @@ func (a *App) show(st navState) {
 	if a.cluster == nil {
 		return
 	}
+	if a.prefs.SetLastNamespace(a.cluster.Context, a.ns) {
+		if err := a.prefs.Save(); err != nil {
+			a.flash("Cannot save settings: "+err.Error(), true)
+		}
+	}
 	a.drawer.close()
 	a.page = st.page
 	switch st.page {

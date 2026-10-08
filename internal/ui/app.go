@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -307,6 +308,13 @@ func (a *App) connect(kctx string) {
 			a.events, a.unread = nil, 0
 			a.startHealth(c)
 			a.sidebar.reload(c)
+			a.ns = a.prefs.LastNamespace(c.Context)
+			if a.opts.Namespace != "" { // --namespace only applies to the first connect
+				a.ns, a.opts.Namespace = a.opts.Namespace, ""
+			}
+			if a.ns != "" && len(nss) > 0 && !slices.Contains(nss, a.ns) {
+				a.ns = "" // deleted since (an empty list = no list permission: keep it)
+			}
 			res := a.opts.Resource
 			if res == "" {
 				res = overviewGVR

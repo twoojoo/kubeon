@@ -148,3 +148,25 @@ func TestCleanForwardName(t *testing.T) {
 		t.Fatal("whitespace handling")
 	}
 }
+
+func TestLastNamespace(t *testing.T) {
+	t.Setenv("KUBEON_CONFIG_DIR", t.TempDir())
+	p := Load()
+	if p.SetLastNamespace("c", "") || len(p.Contexts) != 0 {
+		t.Fatal("all namespaces on an unknown context must not add an entry")
+	}
+	if !p.SetLastNamespace("c", "demo") || p.SetLastNamespace("c", "demo") {
+		t.Fatal("changed reports")
+	}
+	p.SetPolicy("c", true, true)
+	if err := p.Save(); err != nil {
+		t.Fatal(err)
+	}
+	q := Load()
+	if q.LastNamespace("c") != "demo" || !q.ReadOnly("c") || q.LastNamespace("other") != "" {
+		t.Fatalf("contexts %+v", q.Contexts)
+	}
+	if !q.SetLastNamespace("c", "") || q.LastNamespace("c") != "" {
+		t.Fatal("back to all namespaces")
+	}
+}

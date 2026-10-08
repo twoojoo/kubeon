@@ -20,6 +20,8 @@ type ContextPolicy struct {
 	Protected *bool `json:"protected,omitempty"`
 	// ReadOnly blocks every mutating action (UI and assistant proposals).
 	ReadOnly bool `json:"readOnly,omitempty"`
+	// Namespace is the last namespace opened on the context ("" = all).
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // PortForward is a saved tunnel. Pinned ones (AutoStart) are re-opened when
@@ -140,6 +142,21 @@ func (p *Prefs) SetPolicy(ctx string, protected, readOnly bool) {
 	c := p.Contexts[ctx]
 	c.Protected, c.ReadOnly = &protected, readOnly
 	p.Contexts[ctx] = c
+}
+
+// LastNamespace is the namespace last opened on ctx ("" = all).
+func (p *Prefs) LastNamespace(ctx string) string { return p.Contexts[ctx].Namespace }
+
+// SetLastNamespace remembers the namespace opened on ctx; it reports whether
+// the value changed (i.e. whether the preferences need saving).
+func (p *Prefs) SetLastNamespace(ctx, ns string) bool {
+	c, ok := p.Contexts[ctx]
+	if c.Namespace == ns && (ok || ns == "") {
+		return false
+	}
+	c.Namespace = ns
+	p.Contexts[ctx] = c
+	return true
 }
 
 func samePF(a, b PortForward) bool {
