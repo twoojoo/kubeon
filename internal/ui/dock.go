@@ -34,8 +34,9 @@ type Dock struct {
 
 	dragTag  int
 	dragging bool
-	grabY    float32
+	grabY    float32 // pointer offset inside the grip at press
 	curH     int
+	top      int // dock top in the parent, as laid out last frame
 }
 
 func newDock(a *App) *Dock { return &Dock{app: a} }
@@ -117,6 +118,7 @@ func (d *Dock) Layout(gtx C) D {
 	}
 
 	maxH := gtx.Constraints.Max.Y
+	d.drag(gtx, maxH)
 	h := d.height
 	if h == 0 {
 		h = maxH * 42 / 100
@@ -128,6 +130,7 @@ func (d *Dock) Layout(gtx C) D {
 	} else {
 		d.curH = h
 	}
+	d.top = maxH - h
 
 	gtx.Constraints = layout.Exact(image.Pt(gtx.Constraints.Max.X, h))
 	fill(gtx, pal.Bg)
@@ -142,17 +145,14 @@ func (d *Dock) Layout(gtx C) D {
 	)
 }
 
-func (d *Dock) layoutBar(gtx C, barH int) D {
-	th := d.app.th
-	sz := image.Pt(gtx.Constraints.Max.X, barH)
-	fillRect(gtx, pal.Header, image.Rectangle{Max: sz})
-	fillRect(gtx, pal.Border, image.Rect(0, 0, sz.X, gtx.Dp(1)))
-
-	// drag the top edge to resize
-	grip := clip.Rect{Max: image.Pt(sz.X, gtx.Dp(5))}.Push(gtx.Ops)
-	pointer.CursorRowResize.Add(gtx.Ops)
-	event.Op(gtx.Ops, &d.dragTag)
-	grip.Pop()
+// drag resizes the dock from its top-edge grip. Pointer positions are
+// relative to the grip, which moves while dragging: they are turned into
+// absolute positions with the dock's top of the frame they were hit-tested in,
+// and the height is set from that absolute position (no accumulated deltas,
+// which overshoot when several drag events arrive in one frame). Events are
+// read before the height is computed so the dock follows in the same frame.
+func (d *Dock) drag(gtx C, maxH int) {
+	prevTop := d.top
 	for {
 		ev, ok := gtx.Event(pointer.Filter{Target: &d.dragTag, Kinds: pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel})
 		if !ok {
@@ -166,14 +166,27 @@ func (d *Dock) layoutBar(gtx C, barH int) D {
 		case pointer.Press:
 			d.dragging, d.grabY, d.height = true, pe.Position.Y, d.curH
 		case pointer.Drag:
-			// positions are relative to the grip, which follows the pointer
 			if d.dragging {
-				d.height -= int(pe.Position.Y - d.grabY)
+				y := float32(prevTop) + pe.Position.Y - d.grabY // where the dock top should be
+				d.height = maxH - int(y+0.5)
 			}
 		case pointer.Release, pointer.Cancel:
 			d.dragging = false
 		}
 	}
+}
+
+func (d *Dock) layoutBar(gtx C, barH int) D {
+	th := d.app.th
+	sz := image.Pt(gtx.Constraints.Max.X, barH)
+	fillRect(gtx, pal.Header, image.Rectangle{Max: sz})
+	fillRect(gtx, pal.Border, image.Rect(0, 0, sz.X, gtx.Dp(1)))
+
+	// drag the top edge to resize
+	grip := clip.Rect{Max: image.Pt(sz.X, gtx.Dp(5))}.Push(gtx.Ops)
+	pointer.CursorRowResize.Add(gtx.Ops)
+	event.Op(gtx.Ops, &d.dragTag)
+	grip.Pop()
 
 	gtx.Constraints = layout.Exact(sz)
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
