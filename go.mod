@@ -1,4 +1,4 @@
-module github.com/giovanni/kubeon
+module github.com/twoojoo/kubeon
 
 go 1.25.8
 

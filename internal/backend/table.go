@@ -14,11 +14,11 @@ import (
 	"github.com/derailed/tcell/v2"
 	"github.com/derailed/tview"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/dao"
-	"github.com/giovanni/kubeon/third_party/k9s/model"
-	"github.com/giovanni/kubeon/third_party/k9s/model1"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/dao"
+	"github.com/twoojoo/kubeon/third_party/k9s/model"
+	"github.com/twoojoo/kubeon/third_party/k9s/model1"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
 )
 
 // RowState is the semantic status of a row, derived from k9s colorers.

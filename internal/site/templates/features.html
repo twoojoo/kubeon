@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>Features</h1>
+<p class="lead">Kubeon draws the k9s engine in a native desktop UI: live tables for every resource and CRD, describe and YAML in a drawer,
+logs and shells in a dock, and the views below. Everything works from the keyboard, k9s style, and with the mouse.</p>
+<table>
+  <thead><tr><th>Feature</th><th>What it does</th><th>Keys</th></tr></thead>
+  <tbody>
+  {{range .Features}}<tr><th><a href="{{rel (print "features/" .Slug "/")}}">{{.Name}}</a></th><td>{{.Description}}</td><td>{{range $i, $k := .Keys}}{{if $i}}, {{end}}<code>{{$k.Key}}</code>{{end}}</td></tr>
+  {{end}}</tbody>
+</table>
+
+<h2>Also in Kubeon</h2>
+<ul>
+  <li>Cluster overview: nodes, pods by status, deployment health, CPU and memory requests (and usage with metrics-server), warning events.</li>
+  <li>Secrets decoded in a tab, with per-key reveal and copy, and download as a <code>.env</code> file.</li>
+  <li>Node cordon, uncordon and drain; scale, rollout restart and delete, also on a multiple selection.</li>
+  <li>Tabs, bookmarks of resource, namespace and filter, dark and light themes, interface zoom.</li>
+  <li>Health notifications (CrashLoop, image pull errors, OOM, node NotReady, degraded deployments) on the desktop and in the app.</li>
+</ul>
+{{end}}

@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 )
 
 // Overview is the cluster dashboard summary (from k9s informer caches).

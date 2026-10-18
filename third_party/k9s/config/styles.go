@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/giovanni/kubeon/third_party/k9s/config/data"
-	"github.com/giovanni/kubeon/third_party/k9s/config/json"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/data"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/json"
 	"github.com/derailed/tcell/v2"
 	"github.com/derailed/tview"
 	"gopkg.in/yaml.v3"

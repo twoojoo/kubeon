@@ -15,10 +15,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/config/data"
-	"github.com/giovanni/kubeon/third_party/k9s/config/json"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/data"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/json"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	"gopkg.in/yaml.v3"
 )
 

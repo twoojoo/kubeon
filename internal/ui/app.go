@@ -22,10 +22,10 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/giovanni/kubeon/internal/backend"
-	"github.com/giovanni/kubeon/internal/notify"
-	"github.com/giovanni/kubeon/internal/prefs"
-	"github.com/giovanni/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/notify"
+	"github.com/twoojoo/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/safety"
 )
 
 // Options configure the UI.

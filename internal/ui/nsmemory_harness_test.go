@@ -5,7 +5,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/prefs"
 )
 
 func TestUINamespacePerContext(t *testing.T) {

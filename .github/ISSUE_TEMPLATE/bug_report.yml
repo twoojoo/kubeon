@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If it involves a resource, include a minimal manifest (kind, namespace, labels).
+  - type: input
+    id: version
+    attributes:
+      label: Kubeon version
+      description: Output of `kubeon --version`, or Preferences → Updates.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Ubuntu 24.04 (Wayland), Windows 11, macOS 15
+    validations:
+      required: true
+  - type: input
+    id: cluster
+    attributes:
+      label: Kubernetes version and distribution
+      placeholder: e.g. 1.33 on EKS, kind, k3s, GKE Autopilot
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Run with `--log-level debug` (log in ~/.cache/kubeon/kubeon.log). Remove cluster names, hostnames and tokens you don't want to share.
+      render: text

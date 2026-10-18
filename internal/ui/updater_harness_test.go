@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/kubeon/internal/update"
+	"github.com/twoojoo/kubeon/internal/update"
 )
 
 func TestUIUpdateDialog(t *testing.T) {

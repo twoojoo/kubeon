@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 )
 
 // ToLabels converts a string into a map of labels.

@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -19,7 +19,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO=derailed/k9s
-MOD=github.com/giovanni/kubeon/third_party/k9s
+MOD=github.com/twoojoo/kubeon/third_party/k9s
 APIDIFF=golang.org/x/exp/cmd/apidiff@v0.0.0-20260410095643-746e56fc9e2f
 FROM_TAG="$(cut -d' ' -f1 "$ROOT/third_party/k9s/UPSTREAM")"
 FROM_SHA="$(cut -d' ' -f2 "$ROOT/third_party/k9s/UPSTREAM")"

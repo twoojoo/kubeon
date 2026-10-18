@@ -7,7 +7,7 @@ import (
 	"gioui.org/io/key"
 	"github.com/hinshun/vt10x"
 
-	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/prefs"
 )
 
 func TestKeySeq(t *testing.T) {

@@ -4,7 +4,7 @@
 package health
 
 import (
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

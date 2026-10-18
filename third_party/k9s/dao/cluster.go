@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 )
 
 // RefScanner represents a resource reference scanner.

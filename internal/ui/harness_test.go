@@ -20,8 +20,8 @@ import (
 	"gioui.org/op"
 	"gioui.org/unit"
 
-	"github.com/giovanni/kubeon/internal/backend"
-	"github.com/giovanni/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/safety"
 )
 
 // harness renders the real App offscreen against the disposable kind

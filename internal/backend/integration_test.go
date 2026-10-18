@@ -17,8 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
-	"github.com/giovanni/kubeon/internal/safety"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 )
 
 // Runs only against the disposable kind cluster (.dev/kubeconfig).

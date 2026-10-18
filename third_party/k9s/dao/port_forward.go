@@ -10,11 +10,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/config"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

@@ -9,7 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 )
 
 const (

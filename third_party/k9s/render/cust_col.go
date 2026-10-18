@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"regexp"
 
-	"github.com/giovanni/kubeon/third_party/k9s/model1"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/model1"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	"github.com/derailed/tview"
 	"k8s.io/kubectl/pkg/cmd/get"
 )

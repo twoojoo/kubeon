@@ -28,7 +28,7 @@ import (
 	"strings"
 )
 
-const k9s = "github.com/giovanni/kubeon/third_party/k9s"
+const k9s = "github.com/twoojoo/kubeon/third_party/k9s"
 
 type pkg struct {
 	ImportPath string

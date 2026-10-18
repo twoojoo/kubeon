@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s"
 	"github.com/sahilm/fuzzy"
 )
 

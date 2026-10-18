@@ -10,7 +10,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 )
 
 // SnapshotOnce returns the first loaded table of gvr in ns (one-shot

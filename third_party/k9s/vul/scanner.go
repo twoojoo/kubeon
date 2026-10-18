@@ -9,7 +9,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/giovanni/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
 )
 
 // ImgScanner stays nil: scanning disabled.

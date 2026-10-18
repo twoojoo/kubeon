@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/giovanni/kubeon/third_party/k9s/model1"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/model1"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	"github.com/itchyny/gojq"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

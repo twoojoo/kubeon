@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
-	"github.com/giovanni/kubeon/third_party/k9s/view/cmd"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/view/cmd"
 )
 
 // MaxHistory tracks max command history.

@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/config"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )

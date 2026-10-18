@@ -7,7 +7,7 @@ import (
 
 	"gioui.org/io/system"
 
-	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/backend"
 )
 
 // enter drills down like k9s: namespaces → pods, CRDs → instances,

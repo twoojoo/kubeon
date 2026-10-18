@@ -2,8 +2,12 @@
 <component type="desktop-application">
   <id>io.github.twoojoo.kubeon</id>
   <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Kubeon</name>
   <summary>Native Kubernetes IDE powered by the k9s engine</summary>
+  <developer id="io.github.twoojoo">
+    <name>twoojoo</name>
+  </developer>
   <description>
     <p>
       Kubeon is a fast, native desktop IDE for Kubernetes: live resource tables,
@@ -12,11 +16,22 @@
     </p>
   </description>
   <launchable type="desktop-id">kubeon.desktop</launchable>
-  <url type="homepage">https://github.com/twoojoo/kubeon</url>
+  <url type="homepage">https://twoojoo.github.io/kubeon/</url>
+  <url type="bugtracker">https://github.com/twoojoo/kubeon/issues</url>
+  <url type="vcs-browser">https://github.com/twoojoo/kubeon</url>
   <provides>
     <binary>kubeon</binary>
   </provides>
   <categories>
     <category>Development</category>
+    <category>System</category>
   </categories>
+  <keywords>
+    <keyword>Kubernetes</keyword>
+    <keyword>kubectl</keyword>
+    <keyword>k8s</keyword>
+    <keyword>k9s</keyword>
+    <keyword>Lens</keyword>
+    <keyword>Helm</keyword>
+  </keywords>
 </component>

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/kubeon/internal/backend"
-	"github.com/giovanni/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/safety"
 )
 
 func devCluster(t *testing.T) *backend.Cluster {

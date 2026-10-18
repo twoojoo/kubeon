@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/giovanni/kubeon/third_party/k9s/config"
-	"github.com/giovanni/kubeon/third_party/k9s/model1"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/model1"
 	"github.com/derailed/tcell/v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

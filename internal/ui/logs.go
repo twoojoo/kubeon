@@ -19,7 +19,7 @@ import (
 	"gioui.org/widget/material"
 	"gioui.org/x/richtext"
 
-	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/backend"
 )
 
 const maxLogLines = 200_000

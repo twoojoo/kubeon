@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
 )
 
 // Section represents an xray renderer.

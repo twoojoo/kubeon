@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>Kubeon vs Lens</h1>
+<p class="lead">Lens made the Kubernetes IDE popular, and for good reasons: it is polished, has extensions and built-in metrics charts.
+Kubeon is a younger, native alternative: a single Go binary with a GPU-rendered UI on the k9s engine, free software with no account.</p>
+
+<table>
+  <thead><tr><th></th><th>Kubeon</th><th>Lens Desktop</th></tr></thead>
+  <tbody>
+  {{range .Compare}}<tr><th>{{.Topic}}</th><td>{{.Kubeon}}</td><td>{{.Other}}</td></tr>
+  {{end}}</tbody>
+</table>
+
+<h2>Where Kubeon is the better fit</h2>
+<ul>
+  <li><strong>No Electron, no account.</strong> One native process that reads your kubeconfig and talks to your clusters, nothing else.</li>
+  <li><strong>The k9s engine.</strong> Same columns, colors, filters and keys as k9s, live from informers, with virtualized tables.</li>
+  <li><strong>Logs of a whole workload.</strong> One stream for every pod of a deployment, JSON pretty-printed, filtered by level.</li>
+  <li><strong>Production guard rails.</strong> Protected contexts require typing the resource name; read-only contexts block changes in the UI.</li>
+  <li><strong>Free software.</strong> GPL-3.0, with no paid edition.</li>
+</ul>
+
+<h2>Where Lens is the better fit</h2>
+<ul>
+  <li>You rely on Lens extensions or on its Prometheus metrics charts.</li>
+  <li>You use Lens team or enterprise features.</li>
+  <li>You prefer a tool with a long track record in large teams.</li>
+</ul>
+
+<figure class="shot"><img src="{{rel "img/diff.png"}}" width="1440" height="900" loading="lazy" alt="Kubeon YAML edit reviewed as a diff with a server-side dry run"><figcaption>Every YAML edit is shown as a diff and dry-run on the server before it is applied.</figcaption></figure>
+
+<h2>Questions</h2>
+{{range .LensQA}}<details><summary>{{.Q}}</summary><p>{{.A}}</p></details>
+{{end}}
+
+<p class="actions"><a class="btn" href="{{.Download}}">Try Kubeon</a> <a class="btn ghost" href="{{.Repo}}">Source on GitHub</a></p>
+<p class="muted">Lens is a trademark of Mirantis, Inc. This comparison reflects Lens Desktop as publicly documented; corrections are welcome as <a href="{{.Repo}}/issues">issues</a>.</p>
+{{end}}

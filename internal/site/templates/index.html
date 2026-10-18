@@ -1,0 +1,60 @@
+{{define "content"}}
+<section class="hero">
+  <img class="logo" src="{{rel "img/logo.png"}}" width="112" height="112" alt="Kubeon logo">
+  <h1>{{.Tagline}}</h1>
+  <p class="lead">Browse, debug and operate Kubernetes clusters from one native app built on the k9s engine: live tables, logs, shells,
+  port-forwards, Helm and XRay. No Electron, no account, nothing to install in the cluster. Free and open source for Linux, Windows and macOS.</p>
+  <p class="actions">
+    <a class="btn" href="{{.Download}}">Download Kubeon</a>
+    <a class="btn ghost" href="{{.Repo}}">Source on GitHub</a>
+  </p>
+  <p class="muted">Linux: AppImage, .deb, .rpm, .tar.gz · Windows 10+: x64 and ARM64 · macOS 12+: Apple silicon and Intel</p>
+</section>
+
+<figure class="shot hero-shot">
+  <img src="{{rel "img/pods.png"}}" width="1440" height="900" fetchpriority="high" alt="Kubeon pod table with live status, the sidebar and the action bar">
+</figure>
+
+<section>
+  <h2>Why Kubeon</h2>
+  <div class="grid">
+  {{range .Cards}}<article class="card"><h3>{{.Title}}</h3><p>{{.Text}}</p></article>
+  {{end}}</div>
+</section>
+
+<section>
+  <h2>Screenshots</h2>
+  <div class="shots">
+  {{range .Shots}}<figure class="shot"><a href="{{rel (print "img/" .File)}}"><img src="{{rel (print "img/" .File)}}" width="1440" height="900" loading="lazy" alt="{{.Alt}}"></a><figcaption>{{.Alt}}</figcaption></figure>
+  {{end}}</div>
+</section>
+
+<section>
+  <h2>Features</h2>
+  <p>Every view of k9s with a mouse, tabs and a dock, and a few things a terminal can't do. Keyboard first: <code>:</code> or Ctrl+K opens the
+  command palette, and k9s keys work on the selected row.</p>
+  <ul class="pills">
+  {{range .Features}}<li><a href="{{rel (print "features/" .Slug "/")}}">{{.Name}}</a></li>
+  {{end}}</ul>
+</section>
+
+<section>
+  <h2>How it compares</h2>
+  <table>
+    <thead><tr><th></th><th>Kubeon</th><th>Lens Desktop</th><th>Freelens</th><th>Headlamp</th><th>k9s</th></tr></thead>
+    <tbody>
+      <tr><th>Runtime</th><td>native (Go, GPU UI)</td><td>Electron</td><td>Electron</td><td>web / Electron</td><td>terminal (TUI)</td></tr>
+      <tr><th>License</th><td>GPL-3.0</td><td>proprietary</td><td>MIT</td><td>Apache-2.0</td><td>Apache-2.0</td></tr>
+      <tr><th>Price</th><td>free</td><td>free tier + paid plans</td><td>free</td><td>free</td><td>free</td></tr>
+      <tr><th>Account</th><td>none</td><td>Lens ID</td><td>none</td><td>none</td><td>none</td></tr>
+    </tbody>
+  </table>
+  <p><a href="{{rel "kubeon-vs-lens/"}}">Kubeon vs Lens in detail →</a></p>
+</section>
+
+<section>
+  <h2>FAQ</h2>
+  {{range .FAQ}}<details><summary>{{.Q}}</summary><p>{{.A}}</p></details>
+  {{end}}
+</section>
+{{end}}

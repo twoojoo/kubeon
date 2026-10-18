@@ -15,8 +15,8 @@ import (
 	"gioui.org/widget/material"
 	"k8s.io/apimachinery/pkg/util/duration"
 
-	"github.com/giovanni/kubeon/internal/backend"
-	"github.com/giovanni/kubeon/internal/notify"
+	"github.com/twoojoo/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/notify"
 )
 
 const maxEvents = 300

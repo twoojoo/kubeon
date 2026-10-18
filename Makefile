@@ -12,7 +12,7 @@ DEV_TAGS := $(if $(GIO_TAGS),$(GIO_TAGS)$(comma))dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 
 .PHONY: build build-dev run test test-int dev-up dev-down vendor-k9s \
-	icons notices package-linux package-windows package-macos
+	icons notices package-linux package-windows package-macos site site-shots
 
 build:
 	go build -tags '$(GIO_TAGS)' -trimpath -ldflags '-s -w -X main.version=$(VERSION)' -o kubeon ./cmd/kubeon
@@ -41,9 +41,19 @@ dev-down:
 vendor-k9s:
 	./scripts/vendor-k9s.sh && go mod tidy
 
+# ---- website (GitHub Pages, published by .github/workflows/pages.yml) ----
+# static site in dist/site; preview: python3 -m http.server -d dist/site
+site:
+	go run ./scripts/sitegen -out dist/site
+
+# screenshots of the website (internal/site/static/img), headless, against kind
+site-shots:
+	env -u KUBECONFIG KUBEON_SITE_SHOTS=$(CURDIR)/internal/site/static/img go test -tags '$(DEV_TAGS),integration' \
+		-count=1 -timeout 600s -run TestUISiteScreenshots ./internal/ui/
+
 # ---- release packages (dist/) ----
 
-# icons for every package + the UI logo, from packaging/logo-source.png
+# icons for every package, the UI logo and the website logo, from packaging/logo-source.png
 icons:
 	go run ./scripts/icongen -out packaging/icons
 
