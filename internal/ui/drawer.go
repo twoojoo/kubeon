@@ -11,7 +11,7 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/backend"
 )
 
 const (

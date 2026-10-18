@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

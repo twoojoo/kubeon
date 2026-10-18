@@ -11,11 +11,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/config/data"
-	"github.com/giovanni/kubeon/third_party/k9s/config/json"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
-	"github.com/giovanni/kubeon/third_party/k9s/view/cmd"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/data"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/json"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/view/cmd"
 	"gopkg.in/yaml.v3"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )

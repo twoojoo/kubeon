@@ -6,7 +6,7 @@ package model1
 import (
 	"context"
 
-	"github.com/giovanni/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
 	"github.com/derailed/tcell/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

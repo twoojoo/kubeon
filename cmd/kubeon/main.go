@@ -10,11 +10,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/giovanni/kubeon/internal/desktop"
-	"github.com/giovanni/kubeon/internal/prefs"
-	"github.com/giovanni/kubeon/internal/safety"
-	"github.com/giovanni/kubeon/internal/ui"
-	"github.com/giovanni/kubeon/internal/update"
+	"github.com/twoojoo/kubeon/internal/desktop"
+	"github.com/twoojoo/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/internal/ui"
+	"github.com/twoojoo/kubeon/internal/update"
 )
 
 // version is set at build time (-ldflags "-X main.version=…").

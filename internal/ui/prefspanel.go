@@ -6,7 +6,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/widget"
 
-	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/prefs"
 )
 
 // PrefsPanel edits appearance, context safety, bookmarks and forwards.

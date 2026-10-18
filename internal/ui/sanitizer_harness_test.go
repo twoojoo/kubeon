@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/kubeon/internal/backend"
+	"github.com/twoojoo/kubeon/internal/backend"
 )
 
 func TestUISanitizer(t *testing.T) {

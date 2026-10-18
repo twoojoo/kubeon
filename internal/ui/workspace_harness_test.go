@@ -18,7 +18,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 
-	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/prefs"
 )
 
 func isolatedPrefs(t *testing.T) string {

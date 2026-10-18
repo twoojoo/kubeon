@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/color"
-	"github.com/giovanni/kubeon/third_party/k9s/config"
-	"github.com/giovanni/kubeon/third_party/k9s/dao"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/color"
+	"github.com/twoojoo/kubeon/third_party/k9s/config"
+	"github.com/twoojoo/kubeon/third_party/k9s/dao"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 )
 
 // LogsListener represents a log model listener.

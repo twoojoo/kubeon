@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/giovanni/kubeon/third_party/k9s/config/json"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/json"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 

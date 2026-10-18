@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/giovanni/kubeon/third_party/k9s"
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/dao"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/dao"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

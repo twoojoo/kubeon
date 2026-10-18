@@ -1,6 +1,16 @@
+<p align="center"><img src="packaging/icons/kubeon-128.png" width="96" alt="Kubeon logo"></p>
+
 # Kubeon
 
-Native Kubernetes IDE in the spirit of Lens — no Electron, no web stack.
+**Kubeon** is a fast, native, open-source Kubernetes IDE — an alternative to Lens, written in Go
+with a GPU-rendered [Gio](https://gioui.org) UI on top of the [k9s](https://github.com/derailed/k9s)
+engine. No Electron, no web stack, no account: one small binary for Linux, Windows and macOS.
+
+[![ci](https://github.com/twoojoo/kubeon/actions/workflows/ci.yml/badge.svg)](https://github.com/twoojoo/kubeon/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/twoojoo/kubeon?label=download)](https://github.com/twoojoo/kubeon/releases/latest)
+[![license](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+
+**Website: [twoojoo.github.io/kubeon](https://twoojoo.github.io/kubeon/)**
 
 - **UI**: [Gio](https://gioui.org) (GPU immediate-mode, pure Go): Linux (Wayland/X11),
   Windows (Direct3D 11), macOS (Metal).
@@ -58,9 +68,8 @@ well-formed JSON calls written as text, but larger models give far better answer
 
 ## Install
 
-Release packages are published in the public repository
-[twoojoo/kubeon-releases](https://github.com/twoojoo/kubeon-releases/releases)
-(this source repository is private), or build them yourself — see Packaging:
+Download the latest package from
+[Releases](https://github.com/twoojoo/kubeon/releases/latest), or build it yourself — see Packaging:
 
 | OS | Packages | Notes |
 |---|---|---|
@@ -75,7 +84,7 @@ shell `PATH` work. `kubeon --version` prints the version.
 
 ### Updates
 
-Release builds check the latest release of `twoojoo/kubeon-releases` daily (Preferences → Updates, or *Check
+Release builds check the latest release of `twoojoo/kubeon` daily (Preferences → Updates, or *Check
 now*). A newer version shows in the status bar; *Update now* downloads it,
 verifies it and replaces this copy in place, then restarts:
 
@@ -93,11 +102,60 @@ pair; keep the private key safe — losing it means existing installs can no
 longer update themselves). Dev builds never check for updates.
 `KUBEON_UPDATE_URL` points the check at another release endpoint.
 
+### Verifying a download
+
+`SHA256SUMS.txt` lists the checksum of every file and is signed with the Kubeon release key
+(ed25519, `SHA256SUMS.txt.sig`, base64). Public key:
+
+```
+pX1Dosf+ulIw6K2Q6uyYvCbwz99oGrYDw3AmXOLltvg=
+```
+
+The self-updater refuses any file that doesn't match a checksum signed with this key. To check by
+hand: `sha256sum -c SHA256SUMS.txt --ignore-missing`, then verify the signature with any ed25519
+tool, e.g. in Python with `cryptography`:
+
+```python
+import base64
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+key = Ed25519PublicKey.from_public_bytes(base64.b64decode("pX1Dosf+ulIw6K2Q6uyYvCbwz99oGrYDw3AmXOLltvg="))
+key.verify(base64.b64decode(open("SHA256SUMS.txt.sig").read()), open("SHA256SUMS.txt", "rb").read())
+print("signature ok")
+```
+
 ### Third-party licenses
 
 Every package ships `THIRD_PARTY_NOTICES.txt` (`make notices`): the license of
 each linked dependency, the vendored k9s (Apache-2.0) and Gio (Unlicense)
 with the list of Kubeon's modifications, and the MPL-2.0 source note.
+
+## How it compares
+
+| | Kubeon | Lens Desktop | Freelens | Headlamp | k9s |
+|---|---|---|---|---|---|
+| Runtime | native (Go, GPU UI) | Electron | Electron | web / Electron | terminal (TUI) |
+| License | GPL-3.0 | proprietary | MIT | Apache-2.0 | Apache-2.0 |
+| Price | free | free tier + paid plans | free | free | free |
+| Account | none | Lens ID | none | none | none |
+
+## FAQ
+
+**Is there a native Lens alternative without Electron?**
+Yes: Kubeon is a single native binary with a GPU-rendered UI. Tables are virtualized and fed by
+informers, so namespaces with thousands of resources stay responsive.
+
+**Does it need an account, an agent in the cluster or a cloud service?**
+No. Kubeon reads your kubeconfig like kubectl and talks to the API server directly; nothing is
+installed in the cluster and no account is needed.
+
+**Can I use it safely on production clusters?**
+Contexts can be marked protected (auto-detected for names like `prod`): every change asks for a
+typed confirmation. Read-only contexts block edits, deletes, scaling, shells and assistant actions.
+
+**Does the AI assistant send my cluster data anywhere?**
+Only if you configure it, to the provider you choose (a local Ollama model works too). Its tools are
+read-only, Secret values are never sent and tokens, passwords and keys are redacted from every tool
+output. It can be disabled per context.
 
 ## Window chrome
 
@@ -142,11 +200,8 @@ and `MACOS_NOTARY_PROFILE=<notarytool keychain profile>`. In CI set the secrets
 CI (`.github/workflows/ci.yml`) runs unit tests, the kind integration suite with
 headless UI screenshots, builds every package on Linux, Windows and macOS
 runners with a launch smoke test, and on a `v*` tag publishes them, with a
-signed `SHA256SUMS.txt`, as a release of the public `twoojoo/kubeon-releases`
-repository. Secrets: `UPDATE_SIGNING_KEY` (release signing key) and
-`RELEASES_TOKEN` (fine-grained token, Contents read/write on
-`kubeon-releases` only). `packaging/releases-repo/README.md` is that
-repository's README.
+signed `SHA256SUMS.txt`, as a release of this repository. Secret:
+`UPDATE_SIGNING_KEY` (release signing key).
 
 ### Upstream k9s
 
@@ -190,6 +245,7 @@ make dev-up           # kind cluster "kubeon-dev" → .dev/kubeconfig (+ fixture
 make run              # dev build against the kind cluster
 make test             # unit tests
 make test-int         # backend integration + headless UI tests; screenshots in .dev/shots/
+make site             # website (GitHub Pages) in dist/site; make site-shots renews its screenshots
 make dev-down
 make vendor-k9s       # re-vendor k9s (K9S_REF=vX.Y.Z), overlays in third_party/_k9s-overlay
 ```
@@ -203,7 +259,19 @@ internal/ui           Gio app: table, sidebar, drawer, dock (logs/terminal), pic
 internal/safety       kubeconfig/context guard for dev builds
 internal/desktop      OS integration: open URLs, login-shell env import, Wayland cursor settings
 internal/notify       desktop notifications (D-Bus / Notification Center / Windows toasts)
+internal/site         website (GitHub Pages): make site, screenshots from make site-shots
 packaging/            icons, Linux desktop entry + Dockerfile + nfpm, macOS Info.plist, Windows resources
 scripts/package-*.sh  release packaging per OS (make package-linux|windows|macos)
 third_party/k9s       vendored k9s engine (generated by scripts/vendor-k9s.sh — do not edit by hand)
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to send changes and [SECURITY.md](SECURITY.md) to report a
+vulnerability.
+
+## License
+
+Kubeon is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License as published by the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version. See [LICENSE](LICENSE). The vendored k9s engine (`third_party/k9s`)
+is Apache-2.0 and Gio (`third_party/gio`) is Unlicense/MIT; third-party licenses are listed in
+`THIRD_PARTY_NOTICES.txt`, shipped with every package.

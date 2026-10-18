@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/giovanni/kubeon/internal/ai"
+	"github.com/twoojoo/kubeon/internal/ai"
 )
 
 func TestUIAssistant(t *testing.T) {

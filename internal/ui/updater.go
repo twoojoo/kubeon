@@ -10,8 +10,8 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/giovanni/kubeon/internal/safety"
-	"github.com/giovanni/kubeon/internal/update"
+	"github.com/twoojoo/kubeon/internal/safety"
+	"github.com/twoojoo/kubeon/internal/update"
 )
 
 // updState is the self-update state shown in the status bar.

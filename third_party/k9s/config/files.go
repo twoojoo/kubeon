@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/giovanni/kubeon/third_party/k9s/config/data"
-	"github.com/giovanni/kubeon/third_party/k9s/slogs"
+	"github.com/twoojoo/kubeon/third_party/k9s/config/data"
+	"github.com/twoojoo/kubeon/third_party/k9s/slogs"
 )
 
 const (

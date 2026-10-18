@@ -4,11 +4,11 @@
 package model
 
 import (
-	"github.com/giovanni/kubeon/third_party/k9s/client"
-	"github.com/giovanni/kubeon/third_party/k9s/dao"
-	"github.com/giovanni/kubeon/third_party/k9s/render"
-	"github.com/giovanni/kubeon/third_party/k9s/render/helm"
-	"github.com/giovanni/kubeon/third_party/k9s/xray"
+	"github.com/twoojoo/kubeon/third_party/k9s/client"
+	"github.com/twoojoo/kubeon/third_party/k9s/dao"
+	"github.com/twoojoo/kubeon/third_party/k9s/render"
+	"github.com/twoojoo/kubeon/third_party/k9s/render/helm"
+	"github.com/twoojoo/kubeon/third_party/k9s/xray"
 )
 
 // Registry tracks resources metadata.

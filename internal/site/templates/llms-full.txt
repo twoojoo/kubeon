@@ -1,0 +1,50 @@
+# {{.Name}}
+
+> {{.Summary}}
+
+Website: {{abs ""}} · Download: {{.Download}} · Source: {{.Repo}} · License: GPL-3.0-or-later
+
+## Overview
+{{range .Cards}}
+### {{.Title}}
+
+{{.Text}}
+{{end}}
+## FAQ
+{{range .FAQ}}
+**{{.Q}}**
+{{.A}}
+{{end}}
+## Kubeon vs Lens
+
+Source: {{abs "kubeon-vs-lens/"}}
+
+| Topic | Kubeon | Lens Desktop |
+|---|---|---|
+{{- range .Compare}}
+| {{.Topic}} | {{.Kubeon}} | {{.Other}} |
+{{- end}}
+{{range .LensQA}}
+**{{.Q}}**
+{{.A}}
+{{end}}
+## Features
+{{range .Features}}
+### {{.Name}}
+
+Source: {{abs (print "features/" .Slug "/")}}
+
+{{range .Intro}}{{.}}
+
+{{end -}}
+{{range .Highlights}}
+- {{.}}
+{{- end}}
+{{- range .Notes}}
+- Note: {{.}}
+{{- end}}
+{{- if .Keys}}
+
+Keys: {{range $i, $k := .Keys}}{{if $i}}; {{end}}{{$k.Key}} = {{$k.Action}}{{end}}.
+{{- end}}
+{{end}}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/giovanni/kubeon/internal/prefs"
+	"github.com/twoojoo/kubeon/internal/prefs"
 )
 
 // Kind of provider implementation.

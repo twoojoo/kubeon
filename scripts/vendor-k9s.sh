@@ -26,7 +26,7 @@ done
 # default: re-vendor the version recorded in third_party/k9s/UPSTREAM
 K9S_REF="${K9S_REF:-$(cut -d' ' -f1 "$ROOT/third_party/k9s/UPSTREAM")}"
 OVERLAY="$ROOT/third_party/_k9s-overlay" # "_" prefix: ignored by go build
-MOD="github.com/giovanni/kubeon/third_party/k9s"
+MOD="github.com/twoojoo/kubeon/third_party/k9s"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

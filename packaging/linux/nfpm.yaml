@@ -12,7 +12,7 @@ description: |
   Live resource tables, logs, shell, port-forwards, Helm, XRay, YAML editing
   with diff review, sanitizer, RBAC explorer and an AI assistant.
 homepage: https://github.com/twoojoo/kubeon
-license: Proprietary
+license: GPL-3.0-or-later
 depends:
   - libc6 (>= 2.34)
   - libwayland-client0

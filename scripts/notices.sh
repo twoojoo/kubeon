@@ -49,7 +49,7 @@ https://github.com/derailed/k9s/blob/$(cut -d' ' -f1 third_party/k9s/UPSTREAM)/L
 --------------------------------------------------------------------------------
 HDR
   cat third_party/k9s/LICENSE
-  GOFLAGS=-mod=mod go run "$GO_LICENSES" report --ignore github.com/giovanni/kubeon \
+  GOFLAGS=-mod=mod go run "$GO_LICENSES" report --ignore github.com/twoojoo/kubeon \
     --template packaging/notices.tpl ./cmd/kubeon 2>/dev/null
 } > "$OUT"
 echo "wrote $OUT ($(grep -c '^License:' "$OUT") components)"

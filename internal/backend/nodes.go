@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/giovanni/kubeon/third_party/k9s/dao"
+	"github.com/twoojoo/kubeon/third_party/k9s/dao"
 )
 
 // DrainOpts mirrors kubectl drain flags.
